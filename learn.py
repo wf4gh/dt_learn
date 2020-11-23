@@ -7,7 +7,8 @@ from time import sleep
 
 login_url = 'https://sso.dtdjzx.gov.cn/sso/login'
 redirect_url = 'https://gbwlxy.dtdjzx.gov.cn/oauth2/login/pro'
-courses_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/commendIndex'
+courses_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/commendIndex' # 课程
+subjects_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/projectIndex' # 专题
 
 def lg(s): # log
     print(s)
@@ -16,7 +17,7 @@ class TheSite:
 
     def __init__(self, driver):
         self.driver = driver
-        self.course_to_learn = None
+        self.page_to_learn = None
         self.driver.maximize_window()
 
     def login(self):
@@ -53,7 +54,7 @@ class TheSite:
                 (By.CSS_SELECTOR, 'div[class="video-warp-start"]')))  # 获取当前页面课程
             for course_elem in course_elems:
                 if course_elem.text[-3:] != '已学习':
-                    self.course_to_learn = course_elem
+                    self.page_to_learn = course_elem
 
                     course_name = course_elem.text.split('\n')[0]
                     if course_elem.text[-3:] == '过考试':
@@ -63,13 +64,26 @@ class TheSite:
                         lg(f'准备学习 {course_name}')
                         return True # 是否需要视频学习
                         
-            WebDriverWait(self.driver, 1).until(EC.visibility_of_element_located(
-                (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 当前页面所有课程已学习，点击 下一页
+            WebDriverWait(self.driver, 1).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 当前页面所有课程已学习，点击 下一页
             lg('当前页面所有课程已学习，进入下一页搜索')
+    
+    def to_subject_page(self):
+        sleep(1)
+        self.driver.get(subjects_url)
+        WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.XPATH, '//p[text()="正在举办"]'))).click()
+        cur_tab_elem = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="content-tab active-content"]')))
+        subjects = cur_tab_elem.find_elements_by_css_selector('div[class="course-list-item-message"]') 
+        subjects_status = [s.find_elements_by_xpath('p')[1].text.split('\n')[-1] for s in subjects]
+        attended_idx = subjects_status.index('已报名') 
+        self.page_to_learn = subjects[attended_idx]
+
+
+    def get_subject_to_learn(self):
+        pass
 
     def learn_course(self, watch_video=True):
         sleep(.1)
-        self.course_to_learn.click()  # 进入视频播放页
+        self.page_to_learn.click()  # 进入视频播放页
         sleep(.1)
 
         if not watch_video: # 不需视频学习，则直接进行测试
@@ -210,6 +224,6 @@ class TheSite:
 driver = webdriver.Chrome()
 the_site = TheSite(driver)
 the_site.login()
-while True:
-    course_status = the_site.get_course_to_learn()
-    the_site.learn_course(course_status)
+# while True:
+#     course_status = the_site.get_course_to_learn()
+#     the_site.learn_course(course_status)
