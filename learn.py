@@ -17,7 +17,8 @@ class TheSite:
 
     def __init__(self, driver):
         self.driver = driver
-        self.page_to_learn = None
+        self.subject_to_learn = None # 要学习的专题
+        self.page_to_learn = None # 要学习的具体课程（专题或课程中）
         self.driver.maximize_window()
 
     def login(self):
@@ -67,23 +68,48 @@ class TheSite:
             WebDriverWait(self.driver, 1).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 当前页面所有课程已学习，点击 下一页
             lg('当前页面所有课程已学习，进入下一页搜索')
     
-    def to_subject_page(self):
+    def to_subject(self): # TODO 翻页
         sleep(1)
-        self.driver.get(subjects_url)
-        WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.XPATH, '//p[text()="正在举办"]'))).click()
-        cur_tab_elem = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="content-tab active-content"]')))
-        subjects = cur_tab_elem.find_elements_by_css_selector('div[class="course-list-item-message"]') 
-        subjects_status = [s.find_elements_by_xpath('p')[1].text.split('\n')[-1] for s in subjects]
-        attended_idx = subjects_status.index('已报名') 
-        self.page_to_learn = subjects[attended_idx]
+        self.driver.get(subjects_url) # 进入 专题 页面
+        WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.XPATH, '//p[text()="正在举办"]'))).click() # 确保进入 正在举办 tab
+        cur_tab_elem = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="content-tab active-content"]'))) # 获取此tab下内容
+        subjects = cur_tab_elem.find_elements_by_css_selector('div[class="course-list-item-message"]') # 获取课程信息
+        subjects_status = [s.find_elements_by_xpath('p')[1].text.split('\n')[-1] for s in subjects] # 课程报名状态
+        attended_idx = subjects_status.index('已报名') ###### 学习 已报名 # TODO 自动报名
+        self.subject_to_learn = subjects[attended_idx]
 
 
-    def get_subject_to_learn(self):
-        pass
+def get_subject_course_to_learn(self):
+    sleep(.5)
+    self.subject_to_learn.click()
+    sleep(.5)
+    next_button = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'button[class="btn-next"]')))
+    is_compulsory = True # 默认进入必修课程
+    while next_button.is_enabled():
+        courses = WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item"]'))) # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+        valid_courses = [c for c in courses if c.text != '']
+        for c in valid_courses:
+            if c.text[-3:] != '已学习':
+                self.page_to_learn = c
+                course_name = c.text.split('\n')[0]
+                if c.text[-3:] == '过考试':
+                    lg(f'准备 {course_name} 测试')
+                    return False # 是否需要视频学习
+                else:
+                    lg(f'准备学习 {course_name}')
+                    return True # 是否需要视频学习
+        next_button.click()
+        if is_compulsory and (not next_button.is_enabled()): # 必修课程遍历完毕，进入选修课程
+            self.driver.find_element_by_xpath('//p[text()="选修课程"]').click()
+            is_compulsory = False
+            assert next_button.is_enabled()
+        lg('当前页面所有课程已学习，进入下一页搜索')
 
-    def learn_course(self, watch_video=True):
+    def learn_course(self, watch_video=True, is_subject_course=False):
         sleep(.1)
         self.page_to_learn.click()  # 进入视频播放页
+        if is_subject_course:
+            self.driver.switch_to.window(self.driver.window_handles[1])
         sleep(.1)
 
         if not watch_video: # 不需视频学习，则直接进行测试
@@ -120,6 +146,10 @@ class TheSite:
         else:
             WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located(
                 (By.CSS_SELECTOR, 'button[title="Replay"]')))
+
+        if is_subject_course:
+            self.driver.close()
+            self.driver.switch_to.window(self.driver.window_handles[0])
 
         lg('此课程学习完成')
 
