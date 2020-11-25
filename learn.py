@@ -87,8 +87,11 @@ class TheSite:
         next_button = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'button[class="btn-next"]')))
         is_compulsory = True # 默认进入必修课程
         # while not next_button.is_enabled():
-        #     sleep(.5)
-        while next_button.is_enabled():
+        sleep(.5)
+        page_cnt = len(self.driver.find_elements_by_css_selector('li[class="number"]')) + 1
+        cur_active = int(self.driver.find_element_by_css_selector('li[class="number active"]').text)
+
+        while cur_active <= page_cnt:
             courses = WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message"]'))) # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             valid_courses = [c for c in courses if c.text != '']
             for c in valid_courses:
@@ -102,6 +105,8 @@ class TheSite:
                         lg(f'准备学习 {course_name}')
                         return True # 是否需要视频学习
             next_button.click()
+            sleep(.5)
+            cur_active = int(self.driver.find_element_by_css_selector('li[class="number active"]').text)
             if is_compulsory and (not next_button.is_enabled()): # 必修课程遍历完毕，进入选修课程
                 self.driver.find_element_by_xpath('//p[text()="选修课程"]').click()
                 is_compulsory = False
