@@ -92,6 +92,7 @@ class TheSite:
         cur_active = int(self.driver.find_element_by_css_selector('li[class="number active"]').text)
 
         while cur_active <= page_cnt:
+            sleep(1)
             courses = WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message"]'))) # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             valid_courses = [c for c in courses if c.text != '']
             for c in valid_courses:
