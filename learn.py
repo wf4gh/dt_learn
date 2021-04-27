@@ -127,7 +127,7 @@ class TheSite:
             self.do_exam()
             return
 
-        play_button = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located(
+        play_button = WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[title="Play Video"]')))  # 获取播放按钮
         play_button.click()  # 播放
         sleep(.5)
@@ -143,7 +143,8 @@ class TheSite:
             sleep(.5)
             mins, secs = self.driver.find_element_by_css_selector(
                 'span.vjs-duration-display').text.split(':')
-            dur = int(mins) * 60 + int(secs) + 5
+            if mins.isdigit() and secs.isdigit(): # 解决获取 mins:secs 为 -:- 问题
+                dur = int(mins) * 60 + int(secs) + 5
 
         lg(f'视频长度 {mins}:{secs} ，随堂测试: {has_test} ，开始学习')
         sleep(.5)
