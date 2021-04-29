@@ -99,12 +99,13 @@ class TheSite:
 
         # 等待元素出现，解决 Unable to locate element 问题
         WebDriverWait(self.driver, self.timeout_sec).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, 'li[class="number"]'))) # TODO 专题目录只有一页时，报错
-        WebDriverWait(self.driver, self.timeout_sec).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, 'li[class="number active"]')))
+        sleep(.5)
 
-        # page_cnt = len(self.driver.find_elements_by_css_selector('li[class="number"]')) + 1
+        # page_cnt = len(self.driver.find_elements_by_css_selector('li[class="number"]')) + 1 # 旧，疑似网页改结构已不适配
         page_cnt = int(self.driver.find_elements_by_css_selector('li[class="number"]')[-1].text)
+        if page_cnt is None: # 解决课程目录只有一页时css获取'li[class="number"]'为空问题
+            page_cnt = 1
         cur_active = int(self.driver.find_element_by_css_selector('li[class="number active"]').text)
 
         while cur_active <= page_cnt:
