@@ -99,20 +99,20 @@ class TheSite:
 
         # 等待元素出现，解决 Unable to locate element 问题
         WebDriverWait(self.driver, self.timeout_sec).until(
-            EC.visibility_of_element_located((By.CSS_SELECTOR, 'li[class="number"]')))
+            EC.visibility_of_element_located((By.CSS_SELECTOR, 'li[class="number"]'))) # TODO 专题目录只有一页时，报错
         WebDriverWait(self.driver, self.timeout_sec).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, 'li[class="number active"]')))
 
-        page_cnt = len(self.driver.find_elements_by_css_selector(
-            'li[class="number"]')) + 1
-        cur_active = int(self.driver.find_element_by_css_selector(
-            'li[class="number active"]').text)
+        # page_cnt = len(self.driver.find_elements_by_css_selector('li[class="number"]')) + 1
+        page_cnt = int(self.driver.find_elements_by_css_selector('li[class="number"]')[-1].text)
+        cur_active = int(self.driver.find_element_by_css_selector('li[class="number active"]').text)
 
         while cur_active <= page_cnt:
             sleep(1)
             courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
                 (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             valid_courses = [c for c in courses if c.text != '']
+            print(len(valid_courses))
             for c in valid_courses:
                 if c.text[-3:] != '已学习':
                     self.page_to_learn = c.find_element_by_css_selector('h2')
