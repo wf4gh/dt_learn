@@ -20,6 +20,7 @@ class TheSite:
         self.subject_to_learn = None # 要学习的专题
         self.page_to_learn = None # 要学习的具体课程（专题或课程中）
         self.driver.maximize_window()
+        self.timeout_sec = 10
 
     def login(self):
         self.driver.get(login_url)
@@ -40,9 +41,9 @@ class TheSite:
         current_page = 1
         while current_page < target_page_num:
             sleep(.1)
-            WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located(
+            WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                 (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 点击 下一页
-            current_page = int(WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located(
+            current_page = int(WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                 (By.CSS_SELECTOR, 'li[class="number active"]'))).text)  # 获取新的当前页码
         # lg(f'已跳转至第 {target_page_num} 页')
 
@@ -51,7 +52,7 @@ class TheSite:
         lg('搜索当前页面未完成课程')
         while True:
             sleep(1)
-            course_elems = WebDriverWait(self.driver, 10).until(EC.visibility_of_all_elements_located(
+            course_elems = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_all_elements_located(
                 (By.CSS_SELECTOR, 'div[class="video-warp-start"]')))  # 获取当前页面课程
             for course_elem in course_elems:
                 if course_elem.text[-3:] != '已学习':
@@ -65,16 +66,16 @@ class TheSite:
                         lg(f'准备学习 {course_name}')
                         return True # 是否需要视频学习
                         
-            WebDriverWait(self.driver, 1).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 当前页面所有课程已学习，点击 下一页
+            WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 当前页面所有课程已学习，点击 下一页
             lg('当前页面所有课程已学习，进入下一页搜索')
     
     def to_subject(self): # TODO 翻页
         sleep(1)
         self.driver.get(subjects_url) # 进入 专题 页面
-        WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.XPATH, '//p[text()="正在举办"]'))).click() # 确保进入 正在举办 tab
-        # cur_tab_elem = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="content-tab active-content"]'))) # 获取此tab下内容
+        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located((By.XPATH, '//p[text()="正在举办"]'))).click() # 确保进入 正在举办 tab
+        # cur_tab_elem = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="content-tab active-content"]'))) # 获取此tab下内容
         sleep(1)
-        subjects = WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message"]'))) # 获取课程信息
+        subjects = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message"]'))) # 获取课程信息
         # subjects = cur_tab_elem.find_elements_by_css_selector('div[class="course-list-item-message"]') # 获取课程信息
         subjects_status = [s.find_elements_by_xpath('p')[1].text.split('\n')[-1] for s in subjects] # 课程报名状态
         attended_idx = subjects_status.index('已报名') ###### 学习 已报名 # TODO 自动报名
@@ -84,7 +85,7 @@ class TheSite:
         sleep(.5)
         self.subject_to_learn.click()
         sleep(2)
-        next_button = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'button[class="btn-next"]')))
+        next_button = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'button[class="btn-next"]')))
         is_compulsory = True # 默认进入必修课程
         # while not next_button.is_enabled():
         sleep(.5)
@@ -93,7 +94,7 @@ class TheSite:
 
         while cur_active <= page_cnt:
             sleep(1)
-            courses = WebDriverWait(self.driver, 5).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message"]'))) # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+            courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message"]'))) # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             valid_courses = [c for c in courses if c.text != '']
             for c in valid_courses:
                 if c.text[-3:] != '已学习':
@@ -117,21 +118,21 @@ class TheSite:
     def learn_course(self, watch_video=True, is_subject_course=False):
         sleep(.5)
         self.page_to_learn.click()  # 进入视频播放页
-        WebDriverWait(self.driver, 5).until(EC.new_window_is_opened)
+        WebDriverWait(self.driver, self.timeout_sec).until(EC.new_window_is_opened)
         if is_subject_course: # 专题课程会打开新窗口，进行跳转
             self.driver.switch_to.window(self.driver.window_handles[1])
         sleep(.5)
 
         if not watch_video: # 不需视频学习，则直接进行测试
-            WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 点击 随堂测试
+            WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 点击 随堂测试
             self.do_exam()
             return
 
-        play_button = WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located(
+        play_button = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[title="Play Video"]')))  # 获取播放按钮
         play_button.click()  # 播放
         sleep(.5)
-        WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located(
+        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[title="Pause"]'))).click()  # 暂停（使视频长度持续显示）
 
         has_test = True if self.driver.find_element_by_xpath(
@@ -147,7 +148,7 @@ class TheSite:
                 dur = int(mins) * 60 + int(secs) + 5
 
         lg(f'视频长度 {mins}:{secs} ，随堂测试: {has_test} ，开始学习')
-        sleep(.5)
+        sleep(2) # 0.5 -> 2秒，尝试解决 not interactable 问题
         play_button.click()
 
         sleep(dur)
@@ -155,7 +156,7 @@ class TheSite:
         if has_test:
             self.do_exam()
         else:
-            WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located(
+            WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                 (By.CSS_SELECTOR, 'button[title="Replay"]')))
 
         if is_subject_course: # 关闭专题课程新窗口，跳转回原窗口
@@ -165,11 +166,11 @@ class TheSite:
         lg('此课程学习完成')
 
     def do_exam(self):
-        WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located(
+        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 随堂测试 确定
         lg('进入测试')
         ans_dic = {}  # 答案字典
-        all_trials = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located(
+        all_trials = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 获取所有题目 题干、选项、按钮
         next_buttons = all_trials.find_elements_by_xpath(
             '//div[text()="下一题"]')  # 获取所有 下一题/交卷 按钮
@@ -222,19 +223,19 @@ class TheSite:
                 sleep(.5)
                 next_buttons[i].click()  # 点击 下一题（或交卷）
                 if i == trial_num - 1:
-                    WebDriverWait(self.driver, 2).until(EC.visibility_of_element_located(
+                    WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()  # 交卷 确定
 
-                    result_info = WebDriverWait(self.driver, 10).until(EC.visibility_of_element_located(
+                    result_info = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'div[class="infoclass"]'))).text  # 获取测试结果
 
                     lg('已交卷，正在核对答案')
 
                     if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格
                         lg('测试未通过')
-                        WebDriverWait(self.driver, .5).until(EC.visibility_of_element_located(
+                        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()  # 回看试题
-                        correct_answers = WebDriverWait(self.driver, 3).until(
+                        correct_answers = WebDriverWait(self.driver, self.timeout_sec).until(
                             EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess"]')))
                         correct_idx = [
                             int(ca.text) - 1 for ca in correct_answers]
@@ -242,13 +243,13 @@ class TheSite:
                             ans_dic[idx][1] = 1
                         driver.find_element_by_css_selector(
                             'button[class="el-button exit el-button--default el-button--mini"]').click()  # 退出回看
-                        WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located(
+                        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
-                        WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located(
+                        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
                         lg('答案已记录，再次进行测试')
 
-                        all_trials = WebDriverWait(self.driver, 5).until(EC.visibility_of_element_located(
+                        all_trials = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
                         next_buttons = all_trials.find_elements_by_xpath(
                             '//div[text()="下一题"]')  # 重新获取所有 下一题/交卷 按钮
@@ -256,7 +257,7 @@ class TheSite:
                             'div[class="options_wraper"]')  # 获取所有题目选项组
 
                     else:
-                        WebDriverWait(self.driver, .5).until(EC.visibility_of_element_located(
+                        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'button[class="el-button modelBtn exitBtn  el-button--primary el-button--mini"]'))).click()  # 通过测试，退出
                         lg('通过测试')
                         return
