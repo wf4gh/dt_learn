@@ -134,7 +134,7 @@ class TheSite:
             lg('当前页面所有课程已学习，进入下一页搜索')
 
     def learn_course(self, watch_video=True, is_subject_course=False):
-        sleep(.5)
+        sleep(2)
         self.page_to_learn.click()  # 进入视频播放页
         WebDriverWait(self.driver, self.timeout_sec).until(
             EC.new_window_is_opened)
