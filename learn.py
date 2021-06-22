@@ -72,7 +72,7 @@ class TheSite:
                 (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 当前页面所有课程已学习，点击 下一页
             lg('当前页面所有课程已学习，进入下一页搜索')
 
-    def to_subject(self):  # TODO 翻页
+    def to_subject(self, sub_idx_to_learn=None):  # sub_idx_to_learn：在“正在举办”页中学习第几个专题（0，1，2。。。） # TODO 翻页
         sleep(1)
         self.driver.get(subjects_url)  # 进入 专题 页面
         WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
@@ -82,9 +82,12 @@ class TheSite:
         subjects = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
             (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取课程信息
         # subjects = cur_tab_elem.find_elements_by_css_selector('div[class="course-list-item-message"]') # 获取课程信息
-        subjects_status = [s.find_elements_by_xpath(
-            'p')[1].text.split('\n')[-1] for s in subjects]  # 课程报名状态
-        attended_idx = subjects_status.index('已报名')  # 学习 已报名 # TODO 自动报名
+        if sub_idx_to_learn is None:
+            subjects_status = [s.find_elements_by_xpath(
+                'p')[1].text.split('\n')[-1] for s in subjects]  # 课程报名状态
+            attended_idx = subjects_status.index('已报名')  # 学习 已报名 # TODO 自动报名
+        else:
+            attended_idx = sub_idx_to_learn
         self.subject_to_learn = subjects[attended_idx]
 
     def get_subject_course_to_learn(self):
@@ -163,10 +166,16 @@ class TheSite:
         dur = 5
         while dur == 5:  # 解决获取0：00问题
             sleep(.5)
-            mins, secs = self.driver.find_element_by_css_selector(
+            splited_dur =  self.driver.find_element_by_css_selector(
                 'span.vjs-duration-display').text.split(':')
-            if mins.isdigit() and secs.isdigit():  # 解决获取 mins:secs 为 -:- 问题
-                dur = int(mins) * 60 + int(secs) + 5
+            if len(splited_dur) == 2: # 处理视频时长超过一小时问题
+                mins, secs = splited_dur
+                hours = 0
+            else:
+                assert(len(splited_dur) == 3)
+                hours, mins, secs = splited_dur
+            if hours.isdigit() and mins.isdigit() and secs.isdigit():  # 解决获取 mins:secs 为 -:- 问题
+                dur = int(hours) * 3600 + int(mins) * 60 + int(secs) + 5
 
         lg(f'视频长度 {mins}:{secs} ，随堂测试: {has_test} ，开始学习')
         sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
@@ -295,6 +304,6 @@ the_site.login()
 
 # 学习专题课程
 while True:
-    the_site.to_subject()
+    the_site.to_subject(1) # 跳转到“网上专题班”页面
     course_status = the_site.get_subject_course_to_learn()
     the_site.learn_course(course_status, is_subject_course=True)
