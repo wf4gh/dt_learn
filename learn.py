@@ -116,7 +116,7 @@ class TheSite:
             courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
                 (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             valid_courses = [c for c in courses if c.text != '']
-            print(len(valid_courses))
+            # print(len(valid_courses))
             for c in valid_courses:
                 if c.text[-3:] != '已学习':
                     self.page_to_learn = c.find_element_by_css_selector('h2')
