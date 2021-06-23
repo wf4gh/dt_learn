@@ -172,12 +172,12 @@ class TheSite:
                 mins, secs = splited_dur
                 hours = 0
             else:
-                assert(len(splited_dur) == 3)
+                assert len(splited_dur) == 3
                 hours, mins, secs = splited_dur
             if hours.isdigit() and mins.isdigit() and secs.isdigit():  # 解决获取 mins:secs 为 -:- 问题
                 dur = int(hours) * 3600 + int(mins) * 60 + int(secs) + 5
 
-        lg(f'视频长度 {mins}:{secs} ，随堂测试: {has_test} ，开始学习')
+        lg(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {has_test} ，开始学习')
         sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
         play_button.click()
 
