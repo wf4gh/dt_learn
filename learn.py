@@ -170,7 +170,7 @@ class TheSite:
                 'span.vjs-duration-display').text.split(':')
             if len(splited_dur) == 2: # 处理视频时长超过一小时问题
                 mins, secs = splited_dur
-                hours = 0
+                hours = '0'
             else:
                 assert len(splited_dur) == 3
                 hours, mins, secs = splited_dur
