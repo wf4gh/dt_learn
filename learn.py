@@ -71,6 +71,7 @@ class TheSite:
             WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                 (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 当前页面所有课程已学习，点击 下一页
             lg('当前页面所有课程已学习，进入下一页搜索')
+            sleep(1)
 
     def to_subject(self, sub_idx_to_learn=None):  # sub_idx_to_learn：在“正在举办”页中学习第几个专题（0，1，2。。。） # TODO 翻页
         sleep(1)
@@ -193,7 +194,7 @@ class TheSite:
             self.driver.close()
             self.driver.switch_to.window(self.driver.window_handles[0])
 
-        lg('此课程学习完成')
+        lg('此课程学习完成\n')
 
     def do_exam(self):
         WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
@@ -304,6 +305,6 @@ the_site.login()
 
 # 学习专题课程
 while True:
-    the_site.to_subject(1) # 跳转到“网上专题班”页面
+    the_site.to_subject(6) # 跳转到“网上专题班”页面
     course_status = the_site.get_subject_course_to_learn()
     the_site.learn_course(course_status, is_subject_course=True)
