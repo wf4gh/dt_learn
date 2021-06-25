@@ -179,7 +179,11 @@ class TheSite:
                 dur = int(hours) * 3600 + int(mins) * 60 + int(secs) + 5
 
         lg(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {has_test} ，开始学习')
-        sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
+        # sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
+        sleep(.5)
+        play_button = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+            (By.CSS_SELECTOR, 'button[title="Play Video"]'))) # 重新获取 play_button，尝试解决 not interactable 问题 
+        sleep(.5)
         play_button.click()
 
         sleep(dur)
