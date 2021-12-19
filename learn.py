@@ -1,4 +1,5 @@
 from selenium import webdriver
+from selenium.webdriver.common import by
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support.expected_conditions import presence_of_element_located
 from selenium.webdriver.support import expected_conditions as EC
@@ -82,9 +83,8 @@ class TheSite:
         sleep(1)
         subjects = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
             (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取课程信息
-        # subjects = cur_tab_elem.find_elements_by_css_selector('div[class="course-list-item-message"]') # 获取课程信息
         if sub_idx_to_learn is None:
-            subjects_status = [s.find_elements_by_xpath(
+            subjects_status = [s.find_elements(By.XPATH,
                 'p')[1].text.split('\n')[-1] for s in subjects]  # 课程报名状态
             attended_idx = subjects_status.index('已报名')  # 学习 已报名 # TODO 自动报名
         else:
@@ -106,21 +106,25 @@ class TheSite:
             EC.visibility_of_element_located((By.CSS_SELECTOR, 'li[class="number active"]')))
         sleep(.5)
 
-        # page_cnt = len(self.driver.find_elements_by_css_selector('li[class="number"]')) + 1 # 旧，疑似网页改结构已不适配
-        page_cnt = int(self.driver.find_elements_by_css_selector('li[class="number"]')[-1].text)
+        # page_cnt = len(self.driver.find_elements(By.CSS_SELECTOR, 'li[class="number"]')) + 1 # 旧，疑似网页改结构已不适配
+        page_cnt = int(self.driver.find_elements(By.CSS_SELECTOR, 'li[class="number"]')[-1].text)
         if page_cnt is None: # 解决课程目录只有一页时css获取'li[class="number"]'为空问题
             page_cnt = 1
-        cur_active = int(self.driver.find_element_by_css_selector('li[class="number active"]').text)
+        cur_active = int(self.driver.find_element(By.CSS_SELECTOR, 'li[class="number active"]').text)
 
         while cur_active <= page_cnt:
             sleep(1)
-            courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
-                (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+            # courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
+            #     (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+            try: # 网页调整，学完（或学过？）的课程css selector变为'div[class="course-list-item-message active"]' #TODO 先使用try解决问题跑起来，有空再改
+                courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+            except:
+                courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message active"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             valid_courses = [c for c in courses if c.text != '']
             # print(len(valid_courses))
             for c in valid_courses:
                 if c.text[-3:] != '已学习':
-                    self.page_to_learn = c.find_element_by_css_selector('h2')
+                    self.page_to_learn = c.find_element(By.CSS_SELECTOR, 'h2')
                     course_name = c.text.split('\n')[0]
                     if c.text[-3:] == '过考试':
                         lg(f'准备 {course_name} 测试')
@@ -130,7 +134,7 @@ class TheSite:
                         return True  # 是否需要视频学习
             next_button.click()
             sleep(.5)
-            cur_active = int(self.driver.find_element_by_css_selector(
+            cur_active = int(self.driver.find_element(By.CSS_SELECTOR,
                 'li[class="number active"]').text)
             if is_compulsory and (not next_button.is_enabled()):  # 必修课程遍历完毕，进入选修课程
                 self.driver.find_element_by_xpath('//p[text()="选修课程"]').click()
@@ -160,14 +164,17 @@ class TheSite:
         WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[title="Pause"]'))).click()  # 暂停（使视频长度持续显示）
 
-        has_test = True if self.driver.find_element_by_xpath(
+        # has_test = True if self.driver.find_element_by_xpath(
+        #     '//div[text()="随堂测试："]/../div[@class="titleContent"]/span').text == '是' else False  # 判断是否有随堂测试
+
+        has_test = True if self.driver.find_element(By.XPATH,
             '//div[text()="随堂测试："]/../div[@class="titleContent"]/span').text == '是' else False  # 判断是否有随堂测试
 
         # 获取视频长度
         dur = 5
         while dur == 5:  # 解决获取0：00问题
             sleep(.5)
-            splited_dur =  self.driver.find_element_by_css_selector(
+            splited_dur =  self.driver.find_element(By.CSS_SELECTOR,
                 'span.vjs-duration-display').text.split(':')
             if len(splited_dur) == 2: # 处理视频时长超过一小时问题
                 mins, secs = splited_dur
@@ -207,23 +214,23 @@ class TheSite:
         ans_dic = {}  # 答案字典
         all_trials = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 获取所有题目 题干、选项、按钮
-        next_buttons = all_trials.find_elements_by_xpath(
+        next_buttons = all_trials.find_elements(By.XPATH,
             '//div[text()="下一题"]')  # 获取所有 下一题/交卷 按钮
-        trial_num = int(self.driver.find_element_by_css_selector(
+        trial_num = int(self.driver.find_element(By.CSS_SELECTOR,
             'div[class="top_e"] div').text.split('/')[1])  # 题目数
         lg(f'测试共有 {trial_num} 道题')
 
-        all_trial_options = self.driver.find_elements_by_css_selector(
+        all_trial_options = self.driver.find_elements(By.CSS_SELECTOR,
             'div[class="options_wraper"]')  # 获取所有题目选项组
         while True:
             for i in range(trial_num):
                 options = all_trial_options[i]  # 当前题目选项组
-                opt_elems = options.find_elements_by_css_selector(
+                opt_elems = options.find_elements(By.CSS_SELECTOR,
                     'label')  # 当前题目选项
                 opt_counts = len(opt_elems)  # 当前题目选项数
 
                 if i not in ans_dic.keys():  # 第一轮答题
-                    cur_type = ''.join([t.text for t in self.driver.find_elements_by_css_selector(
+                    cur_type = ''.join([t.text for t in self.driver.find_elements(By.CSS_SELECTOR,
                         'span[class="quest_tyle"]')])  # 当前题目类型 单选: 0 / 多选: 1
                     if cur_type in ['单选', '判断']:
                         ans_dic[i] = [0, 0, 0]  # 类型，是否正确答案，当前选择答案(index)
@@ -286,9 +293,9 @@ class TheSite:
 
                         all_trials = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
-                        next_buttons = all_trials.find_elements_by_xpath(
+                        next_buttons = all_trials.find_elements(By.XPATH,
                             '//div[text()="下一题"]')  # 重新获取所有 下一题/交卷 按钮
-                        all_trial_options = self.driver.find_elements_by_css_selector(
+                        all_trial_options = self.driver.find_elements(By.CSS_SELECTOR,
                             'div[class="options_wraper"]')  # 获取所有题目选项组
 
                     else:
@@ -309,6 +316,6 @@ the_site.login()
 
 # 学习专题课程
 while True:
-    the_site.to_subject(6) # 跳转到“网上专题班”页面
+    the_site.to_subject(1) # 跳转到“网上专题班”页面
     course_status = the_site.get_subject_course_to_learn()
     the_site.learn_course(course_status, is_subject_course=True)
