@@ -112,6 +112,7 @@ class TheSite:
             page_cnt = 1
         cur_active = int(self.driver.find_element(By.CSS_SELECTOR, 'li[class="number active"]').text)
 
+        all_courses_learned = False # 标记最后一页课程是否学完
         while cur_active <= page_cnt:
             sleep(1)
             # courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
@@ -121,8 +122,10 @@ class TheSite:
             except:
                 courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'div[class="course-list-item-message active"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             valid_courses = [c for c in courses if c.text != '']
-            # print(len(valid_courses))
+            assert len(valid_courses) != 0
+            print(f'page: {cur_active}/{page_cnt}, length of valid course: {len(valid_courses)}')
             for c in valid_courses:
+                # print(c.text)
                 if c.text[-3:] != '已学习':
                     self.page_to_learn = c.find_element(By.CSS_SELECTOR, 'h2')
                     course_name = c.text.split('\n')[0]
@@ -132,14 +135,20 @@ class TheSite:
                     else:
                         lg(f'准备学习 {course_name}')
                         return True  # 是否需要视频学习
-            next_button.click()
+            if cur_active == page_cnt:
+                all_courses_learned = True
+            else:
+                next_button.click()
             sleep(.5)
             cur_active = int(self.driver.find_element(By.CSS_SELECTOR,
                 'li[class="number active"]').text)
+            if cur_active == page_cnt and not all_courses_learned: # 解决最后一页不看，直接进选修问题
+                continue
             if is_compulsory and (not next_button.is_enabled()):  # 必修课程遍历完毕，进入选修课程
-                self.driver.find_element_by_xpath('//p[text()="选修课程"]').click()
+                # self.driver.find_element(By.XPATH, '//p[text()="选修课程"]').click()
+                self.driver.find_element(By.XPATH, '//span[text()="选修课程"]').click()
                 is_compulsory = False
-                assert next_button.is_enabled()
+                # assert next_button.is_enabled()
             lg('当前页面所有课程已学习，进入下一页搜索')
 
     def learn_course(self, watch_video=True, is_subject_course=False):
