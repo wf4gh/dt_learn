@@ -100,7 +100,7 @@ class TheSite:
             (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取课程信息
         # subjects = cur_tab_elem.find_elements(By.CSS_SELECTOR,'div[class="course-list-item-message"]') # 获取课程信息
         if sub_idx_to_learn is None:
-            subjects_status = [s.find_elements_by_xpath(
+            subjects_status = [s.find_elements(By.XPATH,
                 'p')[1].text.split('\n')[-1] for s in subjects]  # 课程报名状态
             attended_idx = subjects_status.index('已报名')  # 学习 已报名 # TODO 自动报名
         else:
@@ -157,7 +157,7 @@ class TheSite:
             cur_active = int(self.driver.find_element(By.CSS_SELECTOR,
                 'li[class="number active"]').text)
             if is_compulsory and (not next_button.is_enabled()):  # 必修课程遍历完毕，进入选修课程
-                self.driver.find_element_by_xpath('//p[text()="选修课程"]').click()
+                self.driver.find_element(By.XPATH,'//p[text()="选修课程"]').click()
                 is_compulsory = False
                 assert next_button.is_enabled()
             lg('当前页面所有课程已学习，进入下一页搜索')
@@ -184,7 +184,7 @@ class TheSite:
         WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[title="Pause"]'))).click()  # 暂停（使视频长度持续显示）
 
-        has_test = True if self.driver.find_element_by_xpath(
+        has_test = True if self.driver.find_element(By.XPATH,
             '//div[text()="随堂测试："]/../div[@class="titleContent"]/span').text == '是' else False  # 判断是否有随堂测试
 
         # 获取视频长度
@@ -231,7 +231,7 @@ class TheSite:
         ans_dic = {}  # 答案字典
         all_trials = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 获取所有题目 题干、选项、按钮
-        next_buttons = all_trials.find_elements_by_xpath(
+        next_buttons = all_trials.find_elements(By.XPATH,
             '//div[text()="下一题"]')  # 获取所有 下一题/交卷 按钮
         trial_num = int(self.driver.find_element(By.CSS_SELECTOR,
             'div[class="top_e"] div').text.split('/')[1])  # 题目数
@@ -310,7 +310,7 @@ class TheSite:
 
                         all_trials = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
-                        next_buttons = all_trials.find_elements_by_xpath(
+                        next_buttons = all_trials.find_elements(By.XPATH,
                             '//div[text()="下一题"]')  # 重新获取所有 下一题/交卷 按钮
                         all_trial_options = self.driver.find_elements(By.CSS_SELECTOR,
                             'div[class="options_wraper"]')  # 获取所有题目选项组
@@ -321,7 +321,7 @@ class TheSite:
                         lg('通过测试')
                         return
 
-driver = webdriver.Chrome(chrome_options=options)
+driver = webdriver.Chrome(options=options)
 # driver = webdriver.Chrome()
 the_site = TheSite(driver)
 the_site.login()
@@ -338,7 +338,7 @@ the_site.login()
 #     the_site.learn_course(course_status, is_subject_course=True)
 
 # 学习专栏课程
-# while True:
-#     the_site.to_special(1) # 跳转到“网上专题班”页面
-#     course_status = the_site.get_subject_course_to_learn()
-#     the_site.learn_course(course_status, is_subject_course=True)
+while True:
+    the_site.to_special(1) # 跳转到“网上专题班”页面
+    course_status = the_site.get_subject_course_to_learn()
+    the_site.learn_course(course_status, is_subject_course=False)
