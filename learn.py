@@ -324,7 +324,7 @@ the_site.login()
 #     the_site.learn_course(course_status)
 
 # 学习专题课程
-while True:
-    the_site.to_subject(1) # 跳转到“网上专题班”页面
-    course_status = the_site.get_subject_course_to_learn()
-    the_site.learn_course(course_status, is_subject_course=True)
+# while True:
+#     the_site.to_subject(1) # 跳转到“网上专题班”页面
+#     course_status = the_site.get_subject_course_to_learn()
+#     the_site.learn_course(course_status, is_subject_course=True)
