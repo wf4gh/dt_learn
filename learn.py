@@ -14,6 +14,18 @@ subjects_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/projectIndex'  # 专题
 specials_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/specialReList'  # 专栏
 
 
+
+options = webdriver.ChromeOptions()
+ 
+# 处理SSL证书错误问题
+options.add_argument('--ignore-certificate-errors')
+options.add_argument('--ignore-ssl-errors')
+ 
+# 忽略无用的日志
+options.add_experimental_option("excludeSwitches", ['enable-automation', 'enable-logging'])
+# driver = webdriver.Chrome(chrome_options=options)
+
+
 def lg(s):  # log
     print(s)
 
@@ -26,6 +38,8 @@ class TheSite:
         self.page_to_learn = None  # 要学习的具体课程（专题或课程中）
         self.driver.maximize_window()
         self.timeout_sec = 10
+      
+
 
     def login(self):
         self.driver.get(login_url)
@@ -307,8 +321,8 @@ class TheSite:
                         lg('通过测试')
                         return
 
-
-driver = webdriver.Chrome()
+driver = webdriver.Chrome(chrome_options=options)
+# driver = webdriver.Chrome()
 the_site = TheSite(driver)
 the_site.login()
 
