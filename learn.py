@@ -15,14 +15,12 @@ specials_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/specialReList'  # 专栏
 
 
 
-options = webdriver.ChromeOptions()
+my_options = webdriver.ChromeOptions()
  
-# 处理SSL证书错误问题
-options.add_argument('--ignore-certificate-errors')
-options.add_argument('--ignore-ssl-errors')
- 
-# 忽略无用的日志
-options.add_experimental_option("excludeSwitches", ['enable-automation', 'enable-logging'])
+# 处理SSL证书错误问题，忽略无用的日志
+my_options.add_argument('--ignore-certificate-errors')
+my_options.add_argument('--ignore-ssl-errors')
+my_options.add_experimental_option("excludeSwitches", ['enable-automation', 'enable-logging'])
 # driver = webdriver.Chrome(chrome_options=options)
 
 
@@ -36,8 +34,8 @@ class TheSite:
         self.driver = driver
         self.subject_to_learn = None  # 要学习的专题
         self.page_to_learn = None  # 要学习的具体课程（专题或课程中）
-        self.driver.maximize_window()
-        self.timeout_sec = 10
+        self.driver.maximize_window() # 窗口最大化
+        self.timeout_sec = 10 # 最大等待时长
       
 
 
@@ -53,7 +51,6 @@ class TheSite:
         sleep(.1)
 
     def to_course_page(self, target_page_num=1):  # 进入【课程推荐】，并跳转至第target_page_num页
-        # lg(f'将跳转至第 {target_page_num} 页')
         sleep(1)
         self.driver.get(courses_url)
         current_page = 1
@@ -63,7 +60,6 @@ class TheSite:
                 (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 点击 下一页
             current_page = int(WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
                 (By.CSS_SELECTOR, 'li[class="number active"]'))).text)  # 获取新的当前页码
-        # lg(f'已跳转至第 {target_page_num} 页')
 
     def get_course_to_learn(self):
         self.to_course_page(1)
@@ -147,6 +143,51 @@ class TheSite:
                     self.page_to_learn = c.find_element(By.CSS_SELECTOR,'h2')
                     course_name = c.text.split('\n')[0]
                     if c.text[-3:] == '过考试':
+                        lg(f'准备 {course_name} 测试')
+                        return False  # 是否需要视频学习
+                    else:
+                        lg(f'准备学习 {course_name}')
+                        return True  # 是否需要视频学习
+            next_button.click()
+            sleep(.5)
+            cur_active = int(self.driver.find_element(By.CSS_SELECTOR,
+                'li[class="number active"]').text)
+            if is_compulsory and (not next_button.is_enabled()):  # 必修课程遍历完毕，进入选修课程
+                self.driver.find_element(By.XPATH,'//p[text()="选修课程"]').click()
+                is_compulsory = False
+                assert next_button.is_enabled()
+            lg('当前页面所有课程已学习，进入下一页搜索')
+
+    def get_special_course_to_learn(self):
+        sleep(.5)
+        self.subject_to_learn.click()
+        sleep(2)
+        next_button = WebDriverWait(self.driver, self.timeout_sec).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, 'button[class="btn-next"]')))
+        sleep(.5)
+
+        # 等待元素出现，解决 Unable to locate element 问题
+        WebDriverWait(self.driver, self.timeout_sec).until(
+            EC.visibility_of_element_located((By.CSS_SELECTOR, 'li[class="number active"]')))
+        sleep(.5)
+
+        # page_cnt = len(self.driver.find_elements(By.CSS_SELECTOR,'li[class="number"]')) + 1 # 旧，疑似网页改结构已不适配
+        page_cnt = int(self.driver.find_elements(By.CSS_SELECTOR,'li[class="number"]')[-1].text)
+        if page_cnt is None: # 解决课程目录只有一页时css获取'li[class="number"]'为空问题
+            page_cnt = 1
+        cur_active = int(self.driver.find_element(By.CSS_SELECTOR,'li[class="number active"]').text)
+
+        while cur_active <= page_cnt:
+            sleep(1)
+            courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
+                (By.CSS_SELECTOR, 'div[class="class-card gestures "]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+            valid_courses = [c for c in courses if c.text != '']
+            # print(len(valid_courses))
+            for c in valid_courses:
+                if c.text.split('\n')[2] != '已学习':
+                    self.page_to_learn = c.find_element(By.CSS_SELECTOR,'div[class="top-title"]')
+                    course_name = c.text.split('\n')[1]
+                    if c.text.split('\n')[2] == '未通过考试':
                         lg(f'准备 {course_name} 测试')
                         return False  # 是否需要视频学习
                     else:
@@ -321,7 +362,7 @@ class TheSite:
                         lg('通过测试')
                         return
 
-driver = webdriver.Chrome(options=options)
+driver = webdriver.Chrome(options=my_options)
 # driver = webdriver.Chrome()
 the_site = TheSite(driver)
 the_site.login()
@@ -340,5 +381,5 @@ the_site.login()
 # 学习专栏课程
 while True:
     the_site.to_special(1) # 跳转到“网上专题班”页面
-    course_status = the_site.get_subject_course_to_learn()
+    course_status = the_site.get_special_course_to_learn()
     the_site.learn_course(course_status, is_subject_course=False)
