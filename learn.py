@@ -202,11 +202,6 @@ class TheSite:
             sleep(.5)
             cur_active = int(self.driver.find_element(By.CSS_SELECTOR,
                                                       'li[class="number active"]').text)
-            if is_compulsory and (not next_button.is_enabled()):  # 必修课程遍历完毕，进入选修课程
-                self.driver.find_element(
-                    By.XPATH, '//p[text()="选修课程"]').click()
-                is_compulsory = False
-                assert next_button.is_enabled()
             lg('当前页面所有课程已学习，进入下一页搜索')
 
     def learn_course(self, watch_video=True, is_subject_course=False):
