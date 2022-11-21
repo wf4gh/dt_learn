@@ -245,8 +245,8 @@ class TheSite:
                 dur = int(hours) * 3600 + int(mins) * 60 + int(secs) + 5
 
         lg(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {has_test} ，开始学习')
-        # sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
-        sleep(.5)
+        sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
+        # sleep(.5)
         play_button = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[title="Play Video"]')))  # 重新获取 play_button，尝试解决 not interactable 问题
         sleep(.5)
@@ -267,7 +267,8 @@ class TheSite:
         lg('此课程学习完成\n')
 
     def do_exam(self):
-        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+        wait_longer_sec = 30 # 尝试延长等待时间解决测试出现慢问题
+        WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 随堂测试 确定
         lg('进入测试')
         ans_dic = {}  # 答案字典
@@ -324,19 +325,19 @@ class TheSite:
                 sleep(.5)
                 next_buttons[i].click()  # 点击 下一题（或交卷）
                 if i == trial_num - 1:
-                    WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+                    WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()  # 交卷 确定
 
-                    result_info = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+                    result_info = WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'div[class="infoclass"]'))).text  # 获取测试结果
 
                     lg('已交卷，正在核对答案')
 
                     if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格
                         lg('测试未通过')
-                        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+                        WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()  # 回看试题
-                        correct_answers = WebDriverWait(self.driver, self.timeout_sec).until(
+                        correct_answers = WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(
                             EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess"]')))
                         correct_idx = [
                             int(ca.text) - 1 for ca in correct_answers]
@@ -344,9 +345,9 @@ class TheSite:
                             ans_dic[idx][1] = 1
                         driver.find_element(By.CSS_SELECTOR,
                                             'button[class="el-button exit el-button--default el-button--mini"]').click()  # 退出回看
-                        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+                        WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
-                        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+                        WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
                         lg('答案已记录，再次进行测试')
 
@@ -358,7 +359,7 @@ class TheSite:
                                                                       'div[class="options_wraper"]')  # 获取所有题目选项组
 
                     else:
-                        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+                        WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(EC.visibility_of_element_located(
                             (By.CSS_SELECTOR, 'button[class="el-button modelBtn exitBtn  el-button--primary el-button--mini"]'))).click()  # 通过测试，退出
                         lg('通过测试')
                         return
@@ -370,9 +371,9 @@ the_site = TheSite(driver)
 the_site.login()
 
 # 学习课程
-# while True:
-#     course_status = the_site.get_course_to_learn()
-#     the_site.learn_course(course_status)
+while True:
+    course_status = the_site.get_course_to_learn()
+    the_site.learn_course(course_status)
 
 # 学习专题课程
 # while True:
@@ -381,7 +382,7 @@ the_site.login()
 #     the_site.learn_course(course_status, is_subject_course=True)
 
 # 学习专栏课程
-while True:
-    the_site.to_special(1)  # 跳转到“网上专题班”页面
-    course_status = the_site.get_special_course_to_learn()
-    the_site.learn_course(course_status, is_subject_course=False)
+# while True:
+#     the_site.to_special(1)  # 跳转到“网上专题班”页面
+#     course_status = the_site.get_special_course_to_learn()
+#     the_site.learn_course(course_status, is_subject_course=False)
