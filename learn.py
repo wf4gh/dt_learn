@@ -67,10 +67,11 @@ class TheSite:
             course_elems = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_all_elements_located(
                 (By.CSS_SELECTOR, 'div[class="video-warp-start"]')))  # 获取当前页面课程
             for course_elem in course_elems:
-                if course_elem.text[-3:] != '已学习':
+                elem_status = course_elem.text.split('\n')[2]
+                if elem_status != '已学习':
                     self.page_to_learn = course_elem
-                    course_name = course_elem.text.split('\n')[0]
-                    if course_elem.text[-3:] == '过考试':
+                    course_name = course_elem.text.split('\n')[1]
+                    if elem_status == '未通过考试':
                         lg(f'准备 {course_name} 测试')
                         return False  # 是否需要视频学习
                     else:
