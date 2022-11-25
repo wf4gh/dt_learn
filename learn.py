@@ -269,6 +269,7 @@ class TheSite:
 
     def do_exam(self):
         wait_longer_sec = 30 # 尝试延长等待时间解决测试出现慢问题
+        sleep(10) # 尝试延长等待时间解决测试出现慢问题
         WebDriverWait(self.driver, self.timeout_sec + wait_longer_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 随堂测试 确定
         lg('进入测试')
