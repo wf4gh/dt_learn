@@ -87,12 +87,15 @@ class TheSite:
     def to_subject(self, sub_idx_to_learn=None):
         sleep(1)
         self.driver.get(subjects_url)  # 进入 专题 页面
-        WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
-            (By.XPATH, '//p[text()="正在举办"]'))).click()  # 确保进入 正在举办 tab
+        
+        # WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
+        #     (By.XPATH, '//p[text()="正在举办"]'))).click()  # 确保进入 正在举办 tab
+        #似乎默认进入此tab，不需点击？
+
         # cur_tab_elem = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="content-tab active-content"]'))) # 获取此tab下内容
         sleep(1)
-        subjects = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
-            (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取课程信息
+        subjects = WebDriverWait(self.driver, self.timeout_sec + 30).until(EC.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取课程信息 # 调整超时，+30sec
         # subjects = cur_tab_elem.find_elements(By.CSS_SELECTOR,'div[class="course-list-item-message"]') # 获取课程信息
         if sub_idx_to_learn is None:
             subjects_status = [s.find_elements(By.XPATH,
@@ -373,15 +376,15 @@ the_site = TheSite(driver)
 the_site.login()
 
 # 学习课程
-while True:
-    course_status = the_site.get_course_to_learn()
-    the_site.learn_course(course_status)
+# while True:
+#     course_status = the_site.get_course_to_learn()
+#     the_site.learn_course(course_status)
 
 # 学习专题课程
-# while True:
-#     the_site.to_subject(5) # 跳转到“网上专题班”页面
-#     course_status = the_site.get_subject_course_to_learn()
-#     the_site.learn_course(course_status, is_subject_course=True)
+while True:
+    the_site.to_subject(6) # 跳转到“网上专题班”页面
+    course_status = the_site.get_subject_course_to_learn()
+    the_site.learn_course(course_status, is_subject_course=True)
 
 # 学习专栏课程
 # while True:
