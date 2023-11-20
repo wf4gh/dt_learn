@@ -35,6 +35,7 @@ class TheSite:
         self.page_to_learn = None  # 要学习的具体课程（专题或课程中）
         self.driver.maximize_window()  # 窗口最大化
         self.timeout_sec = 10  # 最大等待时长
+        lg('初始化TheSite类')
 
     def login(self):
         self.driver.get(login_url)
@@ -116,10 +117,15 @@ class TheSite:
 
     def get_subject_course_to_learn(self):
         sleep(.5)
+        
         self.subject_to_learn.click()
+        lg('进入subject')
+
         sleep(2)
         next_button = WebDriverWait(self.driver, self.timeout_sec).until(
             EC.visibility_of_element_located((By.CSS_SELECTOR, 'button[class="btn-next"]')))
+        lg('获取‘下一页’按钮')
+
         is_compulsory = True  # 默认进入必修课程
         # while not next_button.is_enabled():
         sleep(.5)
@@ -138,9 +144,11 @@ class TheSite:
             By.CSS_SELECTOR, 'li[class="number active"]').text)
 
         while cur_active <= page_cnt:
+            lg(f'当前课程页数：{cur_active}/{page_cnt}')
             sleep(1)
             courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
-                (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+                # (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ） # 网站更新？
+                (By.CSS_SELECTOR, 'div[class="course-list-item-message active"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             valid_courses = [c for c in courses if c.text != '']
             # print(len(valid_courses))
             for c in valid_courses:
