@@ -115,11 +115,14 @@ class TheSite:
             (By.CSS_SELECTOR, 'div[class="specialCard gestures"]')))  # 获取课程信息
         self.subject_to_learn = subjects[sub_idx_to_learn]
 
-    def get_subject_course_to_learn(self):
+    def get_subject_course_to_learn(self, subject_url=None): # subject_url用于处理无法打开专题页面的情况，直接进入专题网址
         sleep(.5)
         
-        self.subject_to_learn.click()
-        lg('进入subject')
+        if subject_url is None:
+            self.subject_to_learn.click()
+            lg('进入subject')
+        else:
+            self.driver.get(subject_url)           
 
         sleep(2)
         next_button = WebDriverWait(self.driver, self.timeout_sec).until(
@@ -148,7 +151,8 @@ class TheSite:
             sleep(1)
             courses = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
                 # (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ） # 网站更新？
-                (By.CSS_SELECTOR, 'div[class="course-list-item-message active"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+                # (By.CSS_SELECTOR, 'div[class="course-list-item-message active"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+                (By.CSS_SELECTOR, 'div[class="course-list-item"]')))  # 已学\未学课程CSS_SELECTOR似乎不同，使用上级selector
             valid_courses = [c for c in courses if c.text != '']
             # print(len(valid_courses))
             for c in valid_courses:
@@ -389,9 +393,15 @@ the_site.login()
 #     the_site.learn_course(course_status)
 
 # 学习专题课程
+# while True:
+#     the_site.to_subject(6) # 跳转到“网上专题班”页面
+#     course_status = the_site.get_subject_course_to_learn()
+#     the_site.learn_course(course_status, is_subject_course=True)
+
+# 学习专题课程，用于“网上专题班”页面持续转圈无法打开时，直接输入网址进入对应专题学习
 while True:
-    the_site.to_subject(6) # 跳转到“网上专题班”页面
-    course_status = the_site.get_subject_course_to_learn()
+    # the_site.to_subject(6) # 跳转到“网上专题班”页面
+    course_status = the_site.get_subject_course_to_learn(subject_url='https://gbwlxy.dtdjzx.gov.cn/content#/projectDetail?id=3646720435925550517')
     the_site.learn_course(course_status, is_subject_course=True)
 
 # 学习专栏课程
