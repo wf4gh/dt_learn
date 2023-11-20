@@ -158,7 +158,7 @@ class TheSite:
             for c in valid_courses:
                 if c.text[-3:] != '已学习':
                     self.page_to_learn = c.find_element(By.CSS_SELECTOR, 'h2')
-                    course_name = c.text.split('\n')[0]
+                    course_name = c.text.split('\n')[1] #获取课程名
                     if c.text[-3:] == '过考试':
                         lg(f'准备 {course_name} 测试')
                         return False  # 是否需要视频学习
