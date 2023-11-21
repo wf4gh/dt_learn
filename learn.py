@@ -120,9 +120,10 @@ class TheSite:
         
         if subject_url is None:
             self.subject_to_learn.click()
-            lg('进入subject')
+            lg('调用get_subject_course_to_learn,未指定subject_url')
         else:
-            self.driver.get(subject_url)           
+            self.driver.get(subject_url)     
+            lg('调用get_subject_course_to_learn,指定subject_url')
 
         sleep(2)
         next_button = WebDriverWait(self.driver, self.timeout_sec).until(
@@ -165,16 +166,17 @@ class TheSite:
                     else:
                         lg(f'准备学习 {course_name}')
                         return True  # 是否需要视频学习
-            next_button.click()
-            sleep(.5)
-            cur_active = int(self.driver.find_element(By.CSS_SELECTOR,
-                                                      'li[class="number active"]').text)
+            
             if is_compulsory and (not next_button.is_enabled()):  # 必修课程遍历完毕，进入选修课程
                 self.driver.find_element(
                     By.XPATH, '//p[text()="选修课程"]').click()
                 is_compulsory = False
                 assert next_button.is_enabled()
             lg('当前页面所有课程已学习，进入下一页搜索')
+            next_button.click()
+            sleep(.5)
+            cur_active = int(self.driver.find_element(By.CSS_SELECTOR,
+                                                      'li[class="number active"]').text)            
 
     def get_special_course_to_learn(self):
         sleep(.5)
@@ -398,7 +400,7 @@ the_site.login()
 #     course_status = the_site.get_subject_course_to_learn()
 #     the_site.learn_course(course_status, is_subject_course=True)
 
-# 学习专题课程，用于“网上专题班”页面持续转圈无法打开时，直接输入网址进入对应专题学习 # todo 无法循环……有空再改
+# 学习专题课程，用于“网上专题班”页面持续转圈无法打开时，直接输入网址进入对应专题学习
 subject_url='https://gbwlxy.dtdjzx.gov.cn/content#/projectDetail?id=3646720435925550517'
 while True:
     course_status = the_site.get_subject_course_to_learn(subject_url)
