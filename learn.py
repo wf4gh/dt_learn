@@ -95,13 +95,13 @@ class TheSite:
 
         # cur_tab_elem = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div[class="content-tab active-content"]'))) # 获取此tab下内容
         sleep(1)
-        subjects = WebDriverWait(self.driver, self.timeout_sec + 30).until(EC.presence_of_all_elements_located(
-            (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取课程信息 # 调整超时，+30sec
+        subjects = WebDriverWait(self.driver, self.timeout_sec).until(EC.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取课程信息
         # subjects = cur_tab_elem.find_elements(By.CSS_SELECTOR,'div[class="course-list-item-message"]') # 获取课程信息
         if sub_idx_to_learn is None:
             subjects_status = [s.find_elements(By.XPATH,
                                                'p')[1].text.split('\n')[-1] for s in subjects]  # 课程报名状态
-            attended_idx = subjects_status.index('已报名')  # 学习 已报名 # TODO 自动报名
+            attended_idx = subjects_status.index('已报名')  # 学习 已报名
         else:
             attended_idx = sub_idx_to_learn
         self.subject_to_learn = subjects[attended_idx]
@@ -264,7 +264,6 @@ class TheSite:
 
         lg(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {"有" if has_test else "无"} ，开始学习')
         sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
-        # sleep(.5)
         play_button = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[title="Play Video"]')))  # 重新获取 play_button，尝试解决 not interactable 问题
         sleep(.5)
@@ -390,9 +389,9 @@ the_site = TheSite(driver)
 the_site.login()
 
 # 学习课程
-# while True:
-#     course_status = the_site.get_course_to_learn()
-#     the_site.learn_course(course_status)
+while True:
+    course_status = the_site.get_course_to_learn()
+    the_site.learn_course(course_status)
 
 # 学习专题课程
 # while True:
@@ -401,11 +400,11 @@ the_site.login()
 #     the_site.learn_course(course_status, is_subject_course=True)
 
 # 学习专题课程，用于“网上专题班”页面持续转圈无法打开时，直接输入网址进入对应专题学习
-subject_url='https://gbwlxy.dtdjzx.gov.cn/content#/projectDetail?id=3646720435925550517'
-while True:
-    course_status = the_site.get_subject_course_to_learn(subject_url)
-    the_site.learn_course(course_status, is_subject_course=True)
-    the_site.driver.refresh() # 解决学完课程后仍显示未学问题
+# subject_url='https://gbwlxy.dtdjzx.gov.cn/content#/projectDetail?id=3646720435925550517'
+# while True:
+#     course_status = the_site.get_subject_course_to_learn(subject_url)
+#     the_site.learn_course(course_status, is_subject_course=True)
+#     the_site.driver.refresh() # 解决学完课程后仍显示未学问题
 
 # 学习专栏课程
 # while True:
