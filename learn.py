@@ -393,17 +393,17 @@ the_site.login()
 #     the_site.learn_course(course_status)
 
 # 学习专题课程
-while True:
-    the_site.to_subject(6) # 跳转到“网上专题班”页面
-    course_status = the_site.get_subject_course_to_learn()
-    the_site.learn_course(course_status, is_subject_course=True)
+# while True:
+#     the_site.to_subject(6) # 跳转到“网上专题班”页面
+#     course_status = the_site.get_subject_course_to_learn()
+#     the_site.learn_course(course_status, is_subject_course=True)
 
 # 学习专题课程，用于“网上专题班”页面持续转圈无法打开时，直接输入网址进入对应专题学习 # todo 无法循环……有空再改
-# while True:
-#     # the_site.to_subject(6) # 跳转到“网上专题班”页面
-#     subject_url='https://gbwlxy.dtdjzx.gov.cn/content#/projectDetail?id=3646720435925550517'
-#     course_status = the_site.get_subject_course_to_learn(subject_url)
-#     the_site.learn_course(course_status, is_subject_course=True)
+subject_url='https://gbwlxy.dtdjzx.gov.cn/content#/projectDetail?id=3646720435925550517'
+while True:
+    course_status = the_site.get_subject_course_to_learn(subject_url)
+    the_site.learn_course(course_status, is_subject_course=True)
+    the_site.driver.refresh() # 解决学完课程后仍显示未学问题
 
 # 学习专栏课程
 # while True:
