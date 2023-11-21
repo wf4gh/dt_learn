@@ -262,7 +262,7 @@ class TheSite:
             if hours.isdigit() and mins.isdigit() and secs.isdigit():  # 解决获取 mins:secs 为 -:- 问题
                 dur = int(hours) * 3600 + int(mins) * 60 + int(secs) + 5
 
-        lg(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {has_test} ，开始学习')
+        lg(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {"有" if has_test else "无"} ，开始学习')
         sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
         # sleep(.5)
         play_button = WebDriverWait(self.driver, self.timeout_sec).until(EC.visibility_of_element_located(
