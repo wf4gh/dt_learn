@@ -25,11 +25,10 @@ def login():
     print('等待登录(300秒)')
     WebDriverWait(driver, 300).until(EC.presence_of_element_located(
         (By.CSS_SELECTOR, f'a[href="{redirect_url}"]')))
-    sleep(1)
-    print('已登录')
+    # 经跳转页面进入index主页
     driver.get(redirect_url)
-    print('已跳转')
-    sleep(.1)
+
+    print('已登录')
 
 # 获取当前学时信息
 def get_credit_hours():
@@ -50,27 +49,31 @@ def get_credit_hours():
     target_hours = re.findall(r'\d+', target_hours)[0]
     print(f'当前进度：{finished_hours}/{target_hours}学时')
 
-    
+    return int(finished_hours), int(target_hours)
 
 
-def to_course_page(target_page_num=1):  # 进入【课程推荐】，并跳转至第target_page_num页
-    sleep(1)
+# 进入【课程推荐】，并跳转至第target_page_num页
+def to_course_page(target_page_num=1):
     driver.get(courses_url)
     current_page = 1
+    
     while current_page < target_page_num:
-        sleep(.1)
+        # 观察发现课程列表可能延迟数秒，但会和页码及翻页键同时出现
+        # 此处等待向右翻页箭头出现
         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 点击 下一页
+            (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()
         current_page = int(WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'li[class="number active"]'))).text)  # 获取新的当前页码
 
 
 def get_course_to_learn():
     global page_to_learn
+
+    # 已通过等待翻页箭头按钮，确保课程列表已加载到页面
     to_course_page(1)
+
     print('搜索当前页面未完成课程')
     while True:
-        sleep(1)
         course_elems = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_all_elements_located(
             (By.CSS_SELECTOR, 'div[class="video-warp-start"]')))  # 获取当前页面课程
         for course_elem in course_elems:
