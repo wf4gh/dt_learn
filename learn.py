@@ -31,20 +31,22 @@ def login():
     print('已登录')
 
 # 获取当前学时信息
+
+
 def get_credit_hours():
     personal_center_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/personalCenter'
     driver.get(personal_center_url)
 
-    #获取已完成学时
+    # 获取已完成学时
     finished_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))
     ).text
-    #获取总学时
+    # 获取总学时
     target_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
         EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-pro"))
     ).text
 
-    #整理输出
+    # 整理输出
     finished_hours = re.findall(r'\d+', finished_hours)[0]
     target_hours = re.findall(r'\d+', target_hours)[0]
     print(f'当前进度：{finished_hours}/{target_hours}学时')
@@ -53,45 +55,57 @@ def get_credit_hours():
 
 
 # 进入【课程推荐】，并跳转至第target_page_num页
-def to_course_page(target_page_num=1):
-    driver.get(courses_url)
-    current_page = 1
-    
-    while current_page < target_page_num:
-        # 观察发现课程列表可能延迟数秒，但会和页码及翻页键同时出现
-        # 此处等待向右翻页箭头出现
-        WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()
-        current_page = int(WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, 'li[class="number active"]'))).text)  # 获取新的当前页码
+# def to_course_page(target_page_num=1):
+#     driver.get(courses_url)
+#     current_page = 1
+
+#     while current_page < target_page_num:
+#         # 观察发现课程列表可能延迟数秒，但会和页码及翻页键同时出现
+#         # 此处等待向右翻页箭头出现
+#         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+#             (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()
+#         current_page = int(WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+#             (By.CSS_SELECTOR, 'li[class="number active"]'))).text)  # 获取新的当前页码
 
 
 def get_course_to_learn():
     global page_to_learn
 
-    # 已通过等待翻页箭头按钮，确保课程列表已加载到页面
-    to_course_page(1)
+    driver.get(courses_url)
+    # to_course_page(1)
 
     print('搜索当前页面未完成课程')
     while True:
-        course_elems = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_all_elements_located(
-            (By.CSS_SELECTOR, 'div[class="video-warp-start"]')))  # 获取当前页面课程
-        for course_elem in course_elems:
-            elem_status = course_elem.text.split('\n')[2]
-            if elem_status != '已学习':
-                page_to_learn = course_elem
-                course_name = course_elem.text.split('\n')[1]
-                if elem_status == '未通过考试':
-                    print(f'准备 {course_name} 测试')
-                    return False  # 是否需要视频学习
-                else:
-                    print(f'准备学习 {course_name}')
-                    return True  # 是否需要视频学习
+        # 观察发现课程列表可能延迟数秒，但会和页码及翻页键同时出现
+        # 此处等待向右翻页箭头出现
+        next_button = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+            (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]')))
 
-        WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()  # 当前页面所有课程已学习，点击 下一页
+        # 获取（等待）当前页面课程
+        course_elems = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_all_elements_located(
+            (By.CSS_SELECTOR, 'div[class="video-warp-start"]')))
+
+        for course_elem in course_elems:
+            # 提取当前课程元素信息
+            # course_info: ['7341次', 'XX解读', '学习中', '授课教师：张三', '评分：9.7', '时长：', '42:00', '学时：', '1']
+            course_info = course_elem.text.split('\n')
+            _, course_name, course_progress, _, _, _, course_duration, _, course_credit_hours = course_info
+
+            # 如果找到未学课程，则return，进入学习
+            if course_progress != '已学习':
+                page_to_learn = course_elem
+                info = [course_name, course_progress, course_duration, course_credit_hours]
+                if course_progress == '未通过考试':
+                    print(f'准备 {course_name} 测试')
+                    return info, False  # 是否需要视频学习
+                else:
+                    print(
+                        f'准备学习 {course_name}，时长{course_duration}，学时{course_credit_hours}')
+                    return info, True  # 是否需要视频学习
+
+        # for循环运行结束，表明当前页面所有课程已学习，点击 “>” 下一页
         print('当前页面所有课程已学习，进入下一页搜索')
-        sleep(1)
+        next_button.click()
 
 # sub_idx_to_learn：在“正在举办”页中学习第几个专题（0，1，2。。。） # TODO 翻页
 
@@ -241,7 +255,7 @@ def get_special_course_to_learn():
         print('当前页面所有课程已学习，进入下一页搜索')
 
 
-def learn_course(watch_video=True, is_subject_course=False):
+def learn_course(course_info=None, watch_video=True, is_subject_course=False):
     sleep(2)
     page_to_learn.click()  # 进入视频播放页
     WebDriverWait(driver, TIMEOUT_SEC).until(
@@ -423,25 +437,25 @@ page_to_learn = None  # 要学习的具体课程（专题或课程中）
 
 # 学习课程
 # while True:
-#     course_status = get_course_to_learn()
-#     learn_course(course_status)
+#     info, course_status = get_course_to_learn()
+#     learn_course(course_info=info, watch_video=course_status)
 
 
 # 学习专题课程
 # while True:
 #     to_subject(6) # 跳转到“网上专题班”页面
 #     course_status = get_subject_course_to_learn()
-#     learn_course(course_status, is_subject_course=True)
+#     learn_course(watch_video=course_status, is_subject_course=True)
 
 # 学习专题课程，用于“网上专题班”页面持续转圈无法打开时，直接输入网址进入对应专题学习
 # subject_url='https://gbwlxy.dtdjzx.gov.cn/content#/projectDetail?id=3646720435925550517'
 # while True:
 #     course_status = get_subject_course_to_learn(subject_url)
-#     learn_course(course_status, is_subject_course=True)
+#     learn_course(watch_video=course_status, is_subject_course=True)
 #     driver.refresh() # 解决学完课程后仍显示未学问题
 
 # 学习专栏课程
 # while True:
 #     to_special(1)  # 跳转到“网上专题班”页面
 #     course_status = get_special_course_to_learn()
-#     learn_course(course_status, is_subject_course=False)
+#     learn_course(watch_video=course_status, is_subject_course=False)
