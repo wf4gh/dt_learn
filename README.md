@@ -5,7 +5,7 @@ Python3 + Selenium， 某学习平台自动化测试脚本
 见源码
 
 ## 运行环境？
-看着配就是
+`pip install -r requirements.txt`
 
 ## 使用方法？
 懂的都懂
