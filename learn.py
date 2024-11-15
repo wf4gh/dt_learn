@@ -56,10 +56,10 @@ def get_credit_hours():
         finished_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))
         ).text
+        # 整理输出
+        target_hours = re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0]
+        finished_hours = re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0]
 
-    # 整理输出
-    finished_hours = re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0]
-    target_hours = re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0]
     print(f'当前进度（精确）：{finished_hours}/{target_hours}学时')
 
 
@@ -472,8 +472,6 @@ prevent_sleep_thread.daemon = True  # 设置为守护线程，这样主线程结
 
 # 启动防止睡眠的线程
 prevent_sleep_thread.start()
-
-
 
 subject_to_learn = None # 避免专题、专栏函数报错用，函数未更新，有必要再改
 
