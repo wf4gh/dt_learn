@@ -56,8 +56,8 @@ def get_credit_hours():
         ).text
 
     # 整理输出
-    finished_hours = re.findall(r'(\d+(\.\d+)?)', finished_hours)[0]
-    target_hours = re.findall(r'(\d+(\.\d+)?)', target_hours)[0]
+    finished_hours = re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0]
+    target_hours = re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0]
     print(f'当前进度：{finished_hours}/{target_hours}学时')
 
 
@@ -77,7 +77,6 @@ def get_course_to_learn():
     global page_to_learn
 
     driver.get(courses_url)
-    # to_course_page(1)
 
     print('搜索当前页面未完成课程')
     while True:
@@ -339,14 +338,6 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
                     (By.CSS_SELECTOR, 'button[title="Replay"]')))
         print('播放结束')
         
-    # has_test = driver.find_element(By.CSS_SELECTOR,
-    #                                'div.title-list').text == '是'
-    # if has_test:
-    #     do_exam()
-    # else:
-    #     WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-    #         (By.CSS_SELECTOR, 'button[title="Replay"]')))
-
     if is_subject_course:  # 关闭专题课程新窗口，跳转回原窗口
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
@@ -360,7 +351,6 @@ def do_exam():
     # sleep(10)  # 尝试延长等待时间解决测试出现慢问题
     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 随堂测试 确定
-    print('进入测试')
     ans_dic = {}  # 答案字典
     all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
         (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 获取所有题目 题干、选项、按钮
@@ -368,7 +358,7 @@ def do_exam():
                                             '//div[text()="下一题"]')  # 获取所有 下一题/交卷 按钮
     trial_num = int(driver.find_element(By.CSS_SELECTOR,
                                         'div[class="top_e"] div').text.split('/')[1])  # 题目数
-    print(f'测试共有 {trial_num} 道题')
+    print(f'进入测试，共 {trial_num} 题')
 
     all_trial_options = driver.find_elements(By.CSS_SELECTOR,
                                              'div[class="options_wraper"]')  # 获取所有题目选项组
@@ -421,18 +411,16 @@ def do_exam():
                 result_info = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'div[class="infoclass"]'))).text  # 获取测试结果
 
-                print('已交卷，正在核对答案')
-
                 if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格
-                    print('测试未通过')
                     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()  # 回看试题
                     
                     # 因为通过测试，肯定有打错的，此处先处理所有题目全部答错的情况
-                    # 全部答错的情况下，获取正确题目为空，超时报错
+                    # 全部答错的情况下，直接尝试获取正确题目为空，超时报错
                     wrong_answers = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
                         EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess isred"]')))
-                    if not len(wrong_answers == trial_num):
+                    wrong_answers_num = len(wrong_answers)
+                    if not wrong_answers_num == trial_num:
                         correct_answers = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
                             EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess"]')))
                         correct_idx = [
@@ -445,7 +433,7 @@ def do_exam():
                         (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
                     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
-                    print('答案已记录，再次进行测试')
+                    print(f'测试未通过（答对 {trial_num-wrong_answers_num}/{trial_num}），答案已记录，再次进行测试')
 
                     all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
@@ -476,17 +464,6 @@ driver.maximize_window()  # 窗口最大化
 login()
 get_credit_hours()
 
-subject_to_learn = None  # 要学习的专题
-page_to_learn = None  # 要学习的具体课程（专题或课程中）
-
-
-# info, course_status = get_course_to_learn()
-# learn_course(course_info=info, watch_video=course_status)
-
-# def test():
-#     for i in range(5, 0, -1):
-#         print(f'\r{i}/{i+1}', end='', flush=True)
-#         sleep(1)
 
 # 学习课程
 # while True:
