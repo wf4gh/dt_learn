@@ -30,21 +30,24 @@ def login():
 
     print('已登录')
 
+
 # 获取当前学时信息
-
-
 def get_credit_hours():
     personal_center_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/personalCenter'
     driver.get(personal_center_url)
 
-    # 获取已完成学时
-    finished_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))
-    ).text
-    # 获取总学时
-    target_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
-        EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-pro"))
-    ).text
+    # 解决抓取过快获取总学时为0的问题
+    target_hours = 0
+    while not target_hours:
+        sleep(.1)
+        # 获取总学时
+        target_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-pro"))
+        ).text
+        # 获取已完成学时
+        finished_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))
+        ).text
 
     # 整理输出
     finished_hours = re.findall(r'\d+', finished_hours)[0]
@@ -94,7 +97,8 @@ def get_course_to_learn():
             # 如果找到未学课程，则return，进入学习
             if course_progress != '已学习':
                 page_to_learn = course_elem
-                info = [course_name, course_progress, course_duration, course_credit_hours]
+                info = [course_name, course_progress,
+                        course_duration, course_credit_hours]
                 if course_progress == '未通过考试':
                     print(f'准备 {course_name} 测试')
                     return info, False  # 是否需要视频学习
@@ -256,13 +260,12 @@ def get_special_course_to_learn():
 
 
 def learn_course(course_info=None, watch_video=True, is_subject_course=False):
-    sleep(2)
+    global page_to_learn
     page_to_learn.click()  # 进入视频播放页
     WebDriverWait(driver, TIMEOUT_SEC).until(
         EC.new_window_is_opened)
     if is_subject_course:  # 专题课程会打开新窗口，进行跳转
         driver.switch_to.window(driver.window_handles[1])
-    sleep(.5)
 
     if not watch_video:  # 不需视频学习，则直接进行测试
         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
@@ -270,40 +273,45 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         do_exam()
         return
 
+    # 获取播放按钮（此时未显示时长）
     play_button = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-        (By.CSS_SELECTOR, 'button[title="Play Video"]')))  # 获取播放按钮
-    play_button.click()  # 播放
+        (By.CSS_SELECTOR, 'button[title="Play Video"]')))
+
+    # 点击播放、暂停，用于显示时长
+    play_button.click()
     sleep(.5)
     WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-        (By.CSS_SELECTOR, 'button[title="Pause"]'))).click()  # 暂停（使视频长度持续显示）
+        (By.CSS_SELECTOR, 'button[title="Pause"]'))).click()  # 暂停
 
-    has_test = True if driver.find_element(By.XPATH,
-                                           '//div[text()="随堂测试："]/../div[@class="titleContent"]/span').text == '是' else False  # 判断是否有随堂测试
+    # todo: 重写此处逻辑
 
-    # 获取视频长度
-    dur = 5
-    while dur == 5:  # 解决获取0：00问题
-        sleep(.5)
-        splited_dur = driver.find_element(By.CSS_SELECTOR,
-                                          'span.vjs-duration-display').text.split(':')
-        if len(splited_dur) == 2:  # 处理视频时长超过一小时问题
-            mins, secs = splited_dur
-            hours = '0'
-        else:
-            assert len(splited_dur) == 3
-            hours, mins, secs = splited_dur
-        if hours.isdigit() and mins.isdigit() and secs.isdigit():  # 解决获取 mins:secs 为 -:- 问题
-            dur = int(hours) * 3600 + int(mins) * 60 + int(secs) + 5
+    # # 获取视频长度
+    # dur = 5
+    # while dur == 5:  # 解决获取0：00问题
+    #     sleep(.5)
+    #     splited_dur = driver.find_element(By.CSS_SELECTOR,
+    #                                       'span.vjs-duration-display').text.split(':')
+    #     if len(splited_dur) == 2:  # 处理视频时长超过一小时问题
+    #         mins, secs = splited_dur
+    #         hours = '0'
+    #     else:
+    #         assert len(splited_dur) == 3
+    #         hours, mins, secs = splited_dur
+    #     if hours.isdigit() and mins.isdigit() and secs.isdigit():  # 解决获取 mins:secs 为 -:- 问题
+    #         dur = int(hours) * 3600 + int(mins) * 60 + int(secs) + 5
 
-    print(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {"有" if has_test else "无"} ，开始学习')
-    sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
-    play_button = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-        (By.CSS_SELECTOR, 'button[title="Play Video"]')))  # 重新获取 play_button，尝试解决 not interactable 问题
-    sleep(.5)
-    play_button.click()
+    # print(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {"有" if has_test else "无"} ，开始学习')
+    # sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
+    # play_button = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+    #     (By.CSS_SELECTOR, 'button[title="Play Video"]')))  # 重新获取 play_button，尝试解决 not interactable 问题
+    # sleep(.5)
+    # play_button.click()
 
-    sleep(dur)
+    # sleep(dur)
 
+    # 判断是否有随堂测试
+    has_test = driver.find_element(By.CSS_SELECTOR,
+                                   '//div.title-list').text == '是'
     if has_test:
         do_exam()
     else:
