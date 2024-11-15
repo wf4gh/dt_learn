@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from time import sleep
 import re
+import sys
 
 TIMEOUT_SEC = 10
 
@@ -30,9 +31,14 @@ def login():
 
     print('已登录')
 
+finished_hours = 0.0
+target_hours = 0.0
 
-# 获取当前学时信息
+# 页面获取当前学时信息
 def get_credit_hours():
+    global finished_hours
+    global target_hours
+
     personal_center_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/personalCenter'
     driver.get(personal_center_url)
 
@@ -50,25 +56,21 @@ def get_credit_hours():
         ).text
 
     # 整理输出
-    finished_hours = re.findall(r'\d+', finished_hours)[0]
-    target_hours = re.findall(r'\d+', target_hours)[0]
+    finished_hours = re.findall(r'(\d+(\.\d+)?)', finished_hours)[0]
+    target_hours = re.findall(r'(\d+(\.\d+)?)', target_hours)[0]
     print(f'当前进度：{finished_hours}/{target_hours}学时')
 
-    return int(finished_hours), int(target_hours)
 
+# 每次学完一课，计算学时
+def update_credit_hours(course_info):
+    global finished_hours
+    global target_hours
 
-# 进入【课程推荐】，并跳转至第target_page_num页
-# def to_course_page(target_page_num=1):
-#     driver.get(courses_url)
-#     current_page = 1
-
-#     while current_page < target_page_num:
-#         # 观察发现课程列表可能延迟数秒，但会和页码及翻页键同时出现
-#         # 此处等待向右翻页箭头出现
-#         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-#             (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]'))).click()
-#         current_page = int(WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-#             (By.CSS_SELECTOR, 'li[class="number active"]'))).text)  # 获取新的当前页码
+    finished_hours += float(course_info[4])
+    print(f'当前进度：{finished_hours}/{target_hours}学时')
+    if finished_hours >= target_hours:
+        print('学时已完成，程序退出')
+        sys.exit(0)
 
 
 def get_course_to_learn():
@@ -261,6 +263,7 @@ def get_special_course_to_learn():
 
 def learn_course(course_info=None, watch_video=True, is_subject_course=False):
     global page_to_learn
+
     page_to_learn.click()  # 进入视频播放页
     WebDriverWait(driver, TIMEOUT_SEC).until(
         EC.new_window_is_opened)
@@ -271,6 +274,7 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 点击 随堂测试
         do_exam()
+        update_credit_hours(course_info)
         return
 
     # 获取播放按钮（此时未显示时长）
@@ -313,46 +317,24 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
                 played_duration[1] * 60 + played_duration[2]
         else:
             played_dur_sec = played_duration[0] * 60 + played_duration[1]
-        print(f'\r{played_duration_text} / {total_duration_text}', end='', flush=True)
-
-    # todo: 重写此处逻辑
-
-    # # 获取视频长度
-    # dur = 5
-    # while dur == 5:  # 解决获取0：00问题
-    #     sleep(.5)
-    #     splited_dur = driver.find_element(By.CSS_SELECTOR,
-    #                                       'span.vjs-duration-display').text.split(':')
-    #     if len(splited_dur) == 2:  # 处理视频时长超过一小时问题
-    #         mins, secs = splited_dur
-    #         hours = '0'
-    #     else:
-    #         assert len(splited_dur) == 3
-    #         hours, mins, secs = splited_dur
-    #     if hours.isdigit() and mins.isdigit() and secs.isdigit():  # 解决获取 mins:secs 为 -:- 问题
-    #         dur = int(hours) * 3600 + int(mins) * 60 + int(secs) + 5
-
-    # print(f'视频长度 {hours}:{mins}:{secs} ，随堂测试: {"有" if has_test else "无"} ，开始学习')
-    # sleep(2)  # 0.5 -> 2秒，尝试解决 not interactable 问题
-    # play_button = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-    #     (By.CSS_SELECTOR, 'button[title="Play Video"]')))  # 重新获取 play_button，尝试解决 not interactable 问题
-    # sleep(.5)
-    # play_button.click()
-
-    # sleep(dur)
-
-    
+        print(f'\r视频播放中 {played_duration_text} / {total_duration_text}', end='', flush=True)
+      
     # 判断是否有随堂测试
     # 如果有测试，不会出现播放回放按钮，播放完成后面直接跳转到测试
-    has_test = driver.find_element(
-        By.CSS_SELECTOR, 'div.title-list').text.split('\n')[-3]
-    assert has_test in ['是', '否']  # 不满足，则需要改动上面语句
+    while True:
+        has_test = driver.find_element(
+            By.CSS_SELECTOR, 'div.title-list').text.split('\n')[-3]
+        if has_test in ['是', '否']:
+            break
+        else:
+            print(f'\r尝试获取测试信息：has_test->{has_test}', end='', flush=True)
+        sleep(.2)
     if has_test == '是':
-        print('等待进行测试')
+        print('\r等待进行测试')
         do_exam()
     else:
         # 通过回放按钮出现判断视频播放完成
-        print('等待播放结束')
+        print('\r等待播放结束')
         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'button[title="Replay"]')))
         print('播放结束')
@@ -370,6 +352,7 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         driver.switch_to.window(driver.window_handles[0])
 
     print('此课程学习完成\n')
+    update_credit_hours(course_info)
 
 
 def do_exam():
@@ -444,12 +427,18 @@ def do_exam():
                     print('测试未通过')
                     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()  # 回看试题
-                    correct_answers = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
-                        EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess"]')))
-                    correct_idx = [
-                        int(ca.text) - 1 for ca in correct_answers]
-                    for idx in correct_idx:
-                        ans_dic[idx][1] = 1
+                    
+                    # 因为通过测试，肯定有打错的，此处先处理所有题目全部答错的情况
+                    # 全部答错的情况下，获取正确题目为空，超时报错
+                    wrong_answers = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+                        EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess isred"]')))
+                    if not len(wrong_answers == trial_num):
+                        correct_answers = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+                            EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess"]')))
+                        correct_idx = [
+                            int(ca.text) - 1 for ca in correct_answers]
+                        for idx in correct_idx:
+                            ans_dic[idx][1] = 1
                     driver.find_element(By.CSS_SELECTOR,
                                         'button[class="el-button exit el-button--default el-button--mini"]').click()  # 退出回看
                     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
@@ -490,13 +479,14 @@ get_credit_hours()
 subject_to_learn = None  # 要学习的专题
 page_to_learn = None  # 要学习的具体课程（专题或课程中）
 
-info, course_status = get_course_to_learn()
-learn_course(course_info=info, watch_video=course_status)
 
-def test():
-    for i in range(5, 0, -1):
-        print(f'\r{i}/{i+1}', end='', flush=True)
-        sleep(1)
+# info, course_status = get_course_to_learn()
+# learn_course(course_info=info, watch_video=course_status)
+
+# def test():
+#     for i in range(5, 0, -1):
+#         print(f'\r{i}/{i+1}', end='', flush=True)
+#         sleep(1)
 
 # 学习课程
 # while True:
