@@ -8,6 +8,8 @@ from selenium.webdriver.common.by import By
 from time import sleep
 import re
 import sys
+import threading
+import pyautogui
 
 TIMEOUT_SEC = 10
 
@@ -58,7 +60,7 @@ def get_credit_hours():
     # 整理输出
     finished_hours = re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0]
     target_hours = re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0]
-    print(f'当前进度：{finished_hours}/{target_hours}学时')
+    print(f'当前进度（精确）：{finished_hours}/{target_hours}学时')
 
 
 # 每次学完一课，计算学时
@@ -66,11 +68,16 @@ def update_credit_hours(course_info):
     global finished_hours
     global target_hours
 
-    finished_hours += float(course_info[4])
-    print(f'当前进度：{finished_hours}/{target_hours}学时')
+    finished_hours += float(course_info[3])
+    print(f'当前进度（估计）：{finished_hours}/{target_hours}学时')
     if finished_hours >= target_hours:
-        print('学时已完成，程序退出')
-        sys.exit(0)
+        print('学时可能已完成，将打开个人中心确认精确进度')
+        get_credit_hours()
+        if finished_hours >= target_hours:
+            print('学时已完成，程序退出')
+            sys.exit(0)
+        else:
+            print('学时未完成，继续学习')
 
 
 def get_course_to_learn():
@@ -322,7 +329,7 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
     # 如果有测试，不会出现播放回放按钮，播放完成后面直接跳转到测试
     while True:
         has_test = driver.find_element(
-            By.CSS_SELECTOR, 'div.title-list').text.split('\n')[-3]
+            By.CSS_SELECTOR, 'div.title-list').text.split('\n随堂测试：\n')[1][0]
         if has_test in ['是', '否']:
             break
         else:
@@ -449,15 +456,38 @@ def do_exam():
                     return
 
 
+# 每5分移动一次鼠标，避免系统休眠或关机
+def prevent_sleep():
+    while True:
+        # 移动鼠标一个像素并移回原位
+        pyautogui.moveRel(1, 0, duration=0.1)  # 向右移动1个像素
+        pyautogui.moveRel(-1, 0, duration=0.1)  # 然后移回到左边
+
+        # 等待5分钟
+        sleep(300)
+
+# 创建防止睡眠的线程
+prevent_sleep_thread = threading.Thread(target=prevent_sleep)
+prevent_sleep_thread.daemon = True  # 设置为守护线程，这样主线程结束时它也会结束
+
+# 启动防止睡眠的线程
+prevent_sleep_thread.start()
+
+
+
+subject_to_learn = None # 避免专题、专栏函数报错用，函数未更新，有必要再改
+
 # 处理SSL证书错误问题，忽略无用的日志
-my_options = webdriver.ChromeOptions()
-my_options.add_argument('--ignore-certificate-errors')
-my_options.add_argument('--ignore-ssl-errors')
-my_options.add_experimental_option(
+chrome_options = webdriver.ChromeOptions()
+chrome_options.add_argument('--ignore-certificate-errors')
+chrome_options.add_argument('--ignore-ssl-errors')
+chrome_options.add_experimental_option(
     "excludeSwitches", ['enable-automation', 'enable-logging'])
+# 网站默认静音
+chrome_options.add_argument("--mute-audio")
 
 # 打开浏览器
-driver = webdriver.Chrome(options=my_options)
+driver = webdriver.Chrome(options=chrome_options)
 driver.maximize_window()  # 窗口最大化
 
 # 以下页面操作
@@ -466,9 +496,9 @@ get_credit_hours()
 
 
 # 学习课程
-# while True:
-#     info, course_status = get_course_to_learn()
-#     learn_course(course_info=info, watch_video=course_status)
+while True:
+    info, course_status = get_course_to_learn()
+    learn_course(course_info=info, watch_video=course_status)
 
 
 # 学习专题课程
@@ -489,3 +519,6 @@ get_credit_hours()
 #     to_special(1)  # 跳转到“网上专题班”页面
 #     course_status = get_special_course_to_learn()
 #     learn_course(watch_video=course_status, is_subject_course=False)
+
+
+
