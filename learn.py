@@ -280,8 +280,40 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
     # 点击播放、暂停，用于显示时长
     play_button.click()
     sleep(.5)
-    WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-        (By.CSS_SELECTOR, 'button[title="Pause"]'))).click()  # 暂停
+    # WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located( # 好像不用暂停
+    #     (By.CSS_SELECTOR, 'button[title="Pause"]'))).click()  # 暂停
+
+    while True:
+        # 获取总时长([hh]:mm:ss)
+        total_duration_text = WebDriverWait(driver, TIMEOUT_SEC).until(EC.presence_of_element_located(
+            (By.CSS_SELECTOR, 'span.vjs-duration-display'))).text
+        if sum(int(i) for i in total_duration_text.split(':')):
+            break
+        sleep(.1)
+
+    total_duration = [int(i) for i in total_duration_text.split(':')]
+
+    if len(total_duration) == 3:
+        total_dur_sec = total_duration[0] * 3600 + \
+            total_duration[1] * 60 + total_duration[2]
+    else:
+        total_dur_sec = total_duration[0] * 60 + total_duration[1]
+
+    played_dur_sec = 0
+    while total_dur_sec-played_dur_sec > 3:
+        sleep(1)
+        # 播放时会隐藏时间，此句获取为空；通过运行javascript获取
+        # played_duration_text = WebDriverWait(driver, TIMEOUT_SEC).until(
+        #     EC.presence_of_element_located((By.CSS_SELECTOR, 'span.vjs-current-time-display'))).text
+        played_duration_text = driver.execute_script(
+            "return document.querySelector('span.vjs-current-time-display').innerText;")
+        played_duration = [int(i) for i in played_duration_text.split(':')]
+        if len(played_duration) == 3:
+            played_dur_sec = played_duration[0] * 3600 + \
+                played_duration[1] * 60 + played_duration[2]
+        else:
+            played_dur_sec = played_duration[0] * 60 + played_duration[1]
+        print(f'\r{played_duration_text} / {total_duration_text}', end='', flush=True)
 
     # todo: 重写此处逻辑
 
@@ -309,14 +341,29 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
 
     # sleep(dur)
 
+    
     # 判断是否有随堂测试
-    has_test = driver.find_element(By.CSS_SELECTOR,
-                                   '//div.title-list').text == '是'
-    if has_test:
+    # 如果有测试，不会出现播放回放按钮，播放完成后面直接跳转到测试
+    has_test = driver.find_element(
+        By.CSS_SELECTOR, 'div.title-list').text.split('\n')[-3]
+    assert has_test in ['是', '否']  # 不满足，则需要改动上面语句
+    if has_test == '是':
+        print('等待进行测试')
         do_exam()
     else:
+        # 通过回放按钮出现判断视频播放完成
+        print('等待播放结束')
         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-            (By.CSS_SELECTOR, 'button[title="Replay"]')))
+                    (By.CSS_SELECTOR, 'button[title="Replay"]')))
+        print('播放结束')
+        
+    # has_test = driver.find_element(By.CSS_SELECTOR,
+    #                                'div.title-list').text == '是'
+    # if has_test:
+    #     do_exam()
+    # else:
+    #     WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+    #         (By.CSS_SELECTOR, 'button[title="Replay"]')))
 
     if is_subject_course:  # 关闭专题课程新窗口，跳转回原窗口
         driver.close()
@@ -327,7 +374,7 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
 
 def do_exam():
     wait_longer_sec = 30  # 尝试延长等待时间解决测试出现慢问题
-    sleep(10)  # 尝试延长等待时间解决测试出现慢问题
+    # sleep(10)  # 尝试延长等待时间解决测试出现慢问题
     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 随堂测试 确定
     print('进入测试')
@@ -442,6 +489,14 @@ get_credit_hours()
 
 subject_to_learn = None  # 要学习的专题
 page_to_learn = None  # 要学习的具体课程（专题或课程中）
+
+info, course_status = get_course_to_learn()
+learn_course(course_info=info, watch_video=course_status)
+
+def test():
+    for i in range(5, 0, -1):
+        print(f'\r{i}/{i+1}', end='', flush=True)
+        sleep(1)
 
 # 学习课程
 # while True:
