@@ -33,10 +33,13 @@ def login():
 
     print('已登录')
 
+
 finished_hours = 0.0
 target_hours = 0.0
 
 # 页面获取当前学时信息
+
+
 def get_credit_hours():
     global finished_hours
     global target_hours
@@ -57,8 +60,8 @@ def get_credit_hours():
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))
         ).text
         # 整理输出
-        target_hours = re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0]
-        finished_hours = re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0]
+        target_hours = float(re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0])
+        finished_hours = float(re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0])
 
     print(f'当前进度（精确）：{finished_hours}/{target_hours}学时')
 
@@ -323,8 +326,9 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
                 played_duration[1] * 60 + played_duration[2]
         else:
             played_dur_sec = played_duration[0] * 60 + played_duration[1]
-        print(f'\r视频播放中 {played_duration_text} / {total_duration_text}', end='', flush=True)
-      
+        print(
+            f'\r视频播放中 {played_duration_text} / {total_duration_text}', end='', flush=True)
+
     # 判断是否有随堂测试
     # 如果有测试，不会出现播放回放按钮，播放完成后面直接跳转到测试
     while True:
@@ -342,9 +346,9 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         # 通过回放按钮出现判断视频播放完成
         print('\r等待播放结束')
         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, 'button[title="Replay"]')))
+            (By.CSS_SELECTOR, 'button[title="Replay"]')))
         print('播放结束')
-        
+
     if is_subject_course:  # 关闭专题课程新窗口，跳转回原窗口
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
@@ -355,9 +359,31 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
 
 def do_exam():
     wait_longer_sec = 30  # 尝试延长等待时间解决测试出现慢问题
-    # sleep(10)  # 尝试延长等待时间解决测试出现慢问题
-    WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
-        (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 随堂测试 确定
+
+    # 确定 按钮可能被一个 div.el-dialog__wrapper 元素遮盖，点击失败。方案1,2如下：
+    # WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+    #     EC.visibility_of_element_located(
+    #         (By.CSS_SELECTOR,
+    #          'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))
+    # ).click()  # 随堂测试 确定
+
+    sleep(.2) # 等待，提升稳定性
+
+    # 方案1：使用 javascript 进行点击
+    button = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+        EC.visibility_of_element_located(
+            (By.CSS_SELECTOR,
+             'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))
+    )
+    driver.execute_script("arguments[0].click();", button)
+
+    # # 方案2：等待元素可点击（未测试）
+    # WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+    #     EC.element_to_be_clickable(
+    #         (By.CSS_SELECTOR,
+    #          'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))
+    # ).click()
+
     ans_dic = {}  # 答案字典
     all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
         (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 获取所有题目 题干、选项、按钮
@@ -421,7 +447,7 @@ def do_exam():
                 if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格
                     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()  # 回看试题
-                    
+
                     # 因为通过测试，肯定有打错的，此处先处理所有题目全部答错的情况
                     # 全部答错的情况下，直接尝试获取正确题目为空，超时报错
                     wrong_answers = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
@@ -440,7 +466,8 @@ def do_exam():
                         (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
                     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
-                    print(f'测试未通过（答对 {trial_num-wrong_answers_num}/{trial_num}），答案已记录，再次进行测试')
+                    print(
+                        f'测试未通过（答对 {trial_num-wrong_answers_num}/{trial_num}），答案已记录，再次进行测试')
 
                     all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
@@ -466,6 +493,7 @@ def prevent_sleep():
         # 等待5分钟
         sleep(300)
 
+
 # 创建防止睡眠的线程
 prevent_sleep_thread = threading.Thread(target=prevent_sleep)
 prevent_sleep_thread.daemon = True  # 设置为守护线程，这样主线程结束时它也会结束
@@ -473,7 +501,7 @@ prevent_sleep_thread.daemon = True  # 设置为守护线程，这样主线程结
 # 启动防止睡眠的线程
 prevent_sleep_thread.start()
 
-subject_to_learn = None # 避免专题、专栏函数报错用，函数未更新，有必要再改
+subject_to_learn = None  # 避免专题、专栏函数报错用，函数未更新，有必要再改
 
 # 处理SSL证书错误问题，忽略无用的日志
 chrome_options = webdriver.ChromeOptions()
@@ -517,6 +545,3 @@ while True:
 #     to_special(1)  # 跳转到“网上专题班”页面
 #     course_status = get_special_course_to_learn()
 #     learn_course(watch_video=course_status, is_subject_course=False)
-
-
-
