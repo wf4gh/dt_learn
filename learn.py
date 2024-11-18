@@ -340,11 +340,11 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
             print(f'\r尝试获取测试信息：has_test->{has_test}', end='', flush=True)
         sleep(.2)
     if has_test == '是':
-        print('\r等待进行测试')
+        print('\n等待进行测试')
         do_exam()
     else:
         # 通过回放按钮出现判断视频播放完成
-        print('\r等待播放结束')
+        print('\n等待播放结束')
         WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'button[title="Replay"]')))
         print('播放结束')
@@ -384,11 +384,10 @@ def do_exam():
     #          'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))
     # ).click()
 
-    ans_dic = {}  # 答案字典
-    all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-        (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 获取所有题目 题干、选项、按钮
-    next_buttons = all_trials.find_elements(By.XPATH,
-                                            '//div[text()="下一题"]')  # 获取所有 下一题/交卷 按钮
+    ans_dic = {}  # 答案字典    
+    # 获取所有 下一题/交卷 按钮
+    next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
+
     trial_num = int(driver.find_element(By.CSS_SELECTOR,
                                         'div[class="top_e"] div').text.split('/')[1])  # 题目数
     print(f'进入测试，共 {trial_num} 题')
@@ -436,8 +435,15 @@ def do_exam():
                         sleep(.1)
                         opt_elems[ans_dic[i][2]].click()
             sleep(.5)
-            next_buttons[i].click()  # 点击 下一题（或交卷）
+            next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）
             if i == trial_num - 1:
+                # 解决可能不点击 交卷 的问题
+                try:
+                    sleep(.5)
+                    next_n_submit_buttons[i].click()
+                except:
+                    print('已点击 交卷')                
+
                 WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()  # 交卷 确定
 
@@ -471,10 +477,9 @@ def do_exam():
 
                     all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
-                    next_buttons = all_trials.find_elements(By.XPATH,
-                                                            '//div[text()="下一题"]')  # 重新获取所有 下一题/交卷 按钮
-                    all_trial_options = driver.find_elements(By.CSS_SELECTOR,
-                                                             'div[class="options_wraper"]')  # 获取所有题目选项组
+                    
+                    # 重新获取一次
+                    next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
 
                 else:
                     WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
