@@ -12,7 +12,7 @@ import threading
 import pyautogui
 
 TIMEOUT_SEC = 10
-
+WAIT_LONGER_SEC = 30  # 尝试延长等待时间解决测试出现慢问题
 
 courses_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/commendIndex'  # 课程
 subjects_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/projectIndex'  # 专题
@@ -59,9 +59,10 @@ def get_credit_hours():
         finished_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))
         ).text
-        # 整理输出
-        target_hours = float(re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0])
-        finished_hours = float(re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0])
+        
+    # 整理输出
+    target_hours = float(re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0])
+    finished_hours = float(re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0])
 
     print(f'当前进度（精确）：{finished_hours}/{target_hours}学时')
 
@@ -341,6 +342,7 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         sleep(.2)
     if has_test == '是':
         print('\n等待进行测试')
+
         do_exam()
     else:
         # 通过回放按钮出现判断视频播放完成
@@ -358,10 +360,22 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
 
 
 def do_exam():
-    wait_longer_sec = 30  # 尝试延长等待时间解决测试出现慢问题
-
+    # todo 某些课程可能需要手动点击进入测试
+    while True:
+        if 'examManage' in driver.current_url:
+            break
+        elif 'coursedetail' in driver.current_url:
+            try:
+                driver.find_element(By.CSS_SELECTOR, 'img.rightBottom').click()
+            except:
+                sleep(.2)
+                continue
+            break
+        else:
+            raise ValueError('url error')
+    
     # 确定 按钮可能被一个 div.el-dialog__wrapper 元素遮盖，点击失败。方案1,2如下：
-    # WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+    # WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
     #     EC.visibility_of_element_located(
     #         (By.CSS_SELECTOR,
     #          'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))
@@ -370,7 +384,7 @@ def do_exam():
     sleep(.2) # 等待，提升稳定性
 
     # 方案1：使用 javascript 进行点击
-    button = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+    button = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
         EC.visibility_of_element_located(
             (By.CSS_SELECTOR,
              'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))
@@ -378,23 +392,36 @@ def do_exam():
     driver.execute_script("arguments[0].click();", button)
 
     # # 方案2：等待元素可点击（未测试）
-    # WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+    # WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
     #     EC.element_to_be_clickable(
     #         (By.CSS_SELECTOR,
     #          'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))
     # ).click()
 
     ans_dic = {}  # 答案字典    
-    # 获取所有 下一题/交卷 按钮
-    next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
+    
 
     trial_num = int(driver.find_element(By.CSS_SELECTOR,
                                         'div[class="top_e"] div').text.split('/')[1])  # 题目数
     print(f'进入测试，共 {trial_num} 题')
 
-    all_trial_options = driver.find_elements(By.CSS_SELECTOR,
-                                             'div[class="options_wraper"]')  # 获取所有题目选项组
+
     while True:
+        # 获取所有 下一题/交卷 按钮
+        # 此处获取了所有 上一题 / 下一题 /交卷，筛选出偶数项
+        next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
+        
+        # all_trial_options = driver.find_elements(By.CSS_SELECTOR,
+        #                                          'div[class="options_wraper"]')  # 获取所有题目选项组
+        
+        all_trial_options = []
+        while not len(all_trial_options):
+            sleep(.2)
+            all_trial_options = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
+                EC.presence_of_all_elements_located(
+                    (By.CSS_SELECTOR,
+                    'div[class="options_wraper"]'))
+            )
         for i in range(trial_num):
             options = all_trial_options[i]  # 当前题目选项组
             opt_elems = options.find_elements(By.CSS_SELECTOR,
@@ -444,23 +471,23 @@ def do_exam():
                 except:
                     print('已点击 交卷')                
 
-                WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
+                WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()  # 交卷 确定
 
-                result_info = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
+                result_info = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'div[class="infoclass"]'))).text  # 获取测试结果
 
                 if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格
-                    WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
+                    WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()  # 回看试题
 
                     # 因为通过测试，肯定有打错的，此处先处理所有题目全部答错的情况
                     # 全部答错的情况下，直接尝试获取正确题目为空，超时报错
-                    wrong_answers = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+                    wrong_answers = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
                         EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess isred"]')))
                     wrong_answers_num = len(wrong_answers)
                     if not wrong_answers_num == trial_num:
-                        correct_answers = WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(
+                        correct_answers = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
                             EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess"]')))
                         correct_idx = [
                             int(ca.text) - 1 for ca in correct_answers]
@@ -468,21 +495,21 @@ def do_exam():
                             ans_dic[idx][1] = 1
                     driver.find_element(By.CSS_SELECTOR,
                                         'button[class="el-button exit el-button--default el-button--mini"]').click()  # 退出回看
-                    WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
+                    WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
-                    WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
+                    WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
                     print(
                         f'测试未通过（答对 {trial_num-wrong_answers_num}/{trial_num}），答案已记录，再次进行测试')
 
-                    all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
+                    # all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+                    #     (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
                     
                     # 重新获取一次
-                    next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
+                    # next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
 
                 else:
-                    WebDriverWait(driver, TIMEOUT_SEC + wait_longer_sec).until(EC.visibility_of_element_located(
+                    WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn exitBtn  el-button--primary el-button--mini"]'))).click()  # 通过测试，退出
                     print('通过测试')
                     return
