@@ -341,14 +341,17 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
             print(f'\r尝试获取测试信息：has_test->{has_test}', end='', flush=True)
         sleep(.2)
     
-    # 通过回放按钮出现判断视频播放完成
+    
     print('\n等待播放结束')
-    WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-        (By.CSS_SELECTOR, 'button[title="Replay"]')))
     
     if has_test == '是':
+        sleep(5) # 确保视频播放完
+        # 视频播放后可能自动跳转或不跳转，在do_exam里处理
         do_exam()
-
+    else:
+        # 通过回放按钮出现判断视频播放完成
+        WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+            (By.CSS_SELECTOR, 'button[title="Replay"]')))
     if is_subject_course:  # 关闭专题课程新窗口，跳转回原窗口
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
