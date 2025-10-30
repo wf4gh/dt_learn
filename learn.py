@@ -575,17 +575,28 @@ login()
 get_credit_hours()
 
 
-# 学习课程
+# 时间紧任务重，直接这么搞吧
+import time
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 while True:
-    # 时间紧任务重，直接这么搞吧
     try:
         info, course_status = get_course_to_learn()
         learn_course(course_info=info, watch_video=course_status)
     except KeyboardInterrupt:
+        print("手动中断")
         break
-    except:
+    except Exception as e:
+        logging.error(f"处理课程时出现错误: {e}")  # 记录错误日志
         sleep(10)
         continue
+
+
+# 学习课程
+# while True:
+#     info, course_status = get_course_to_learn()
+#     learn_course(course_info=info, watch_video=course_status)
 
 # 学习专题课程
 # while True:
