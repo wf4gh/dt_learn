@@ -574,11 +574,19 @@ driver.maximize_window()  # 窗口最大化
 login()
 get_credit_hours()
 
-
+# ------------------------------------------------------
 # 时间紧任务重，直接这么搞吧
-import time
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# 设置日志：同时输出到文件和控制台
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("learn.log"),  # 输出到当前目录下的 log 文件
+        logging.StreamHandler()               # 同时输出到控制台，方便实时查看
+    ]
+)
 
 while True:
     try:
@@ -591,7 +599,9 @@ while True:
         logging.error(f"处理课程时出现错误: {e}")  # 记录错误日志
         sleep(10)
         continue
+    logging.info('本轮成功执行')
 
+# ------------------------------------------------------
 
 # 学习课程
 # while True:
