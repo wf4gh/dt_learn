@@ -26,6 +26,8 @@ def login():
 
     driver.get(login_url)
     print('等待登录(300秒)')
+
+    # TODO: 此元素可能不出现，有可能登陆后出个半页。看情况改成等待其他东西
     WebDriverWait(driver, 300).until(EC.presence_of_element_located(
         (By.CSS_SELECTOR, f'a[href="{redirect_url}"]')))
     # 经跳转页面进入index主页
@@ -90,15 +92,18 @@ def get_course_to_learn():
     driver.get(courses_url)
 
     print('搜索当前页面未完成课程')
+    
+    # 观察发现课程列表可能延迟数秒，或不出现，手动点击“全部”
+    WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+        (By.XPATH, "//span[@class='el-tree-node__label' and text()='全部']"))).click()
+    
     while True:
-        # 观察发现课程列表可能延迟数秒，或不出现，手动点击“全部”
-        WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
-            (By.XPATH, "//span[@class='el-tree-node__label' and text()='全部']"))).click()
-        
         # 等待向右翻页箭头出现
         next_button = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]')))
 
+        sleep(.1)
+        
         # 获取（等待）当前页面课程
         course_elems = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_all_elements_located(
             (By.CSS_SELECTOR, 'div[class="video-warp-start"]')))
@@ -317,7 +322,9 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         total_dur_sec = total_duration[0] * 60 + total_duration[1]
 
     played_dur_sec = 0
-    while total_dur_sec-played_dur_sec > 3:
+
+    # 距视频结束还有5秒以上时，循环获取播放时间
+    while total_dur_sec-played_dur_sec > 5:
         sleep(1)
         # 播放时会隐藏时间，此句获取为空；通过运行javascript获取
         # played_duration_text = WebDriverWait(driver, TIMEOUT_SEC).until(
@@ -434,17 +441,17 @@ def do_exam():
 
             if i not in ans_dic.keys():  # 第一轮答题
                 cur_type = ''.join([t.text for t in driver.find_elements(By.CSS_SELECTOR,
-                                                                         'span[class="quest_tyle"]')])  # 当前题目类型 单选: 0 / 多选: 1
+                                                                         'span[class="quest_tyle"]')])  # 当前题目类型 单选（判断）: 0 / 多选: 1
                 if cur_type in ['单选', '判断']:
                     ans_dic[i] = [0, 0, 0]  # 类型，是否正确答案，当前选择答案(index)
-                    opt_elems[ans_dic[i][2]].click()
+                    opt_elems[ans_dic[i][2]].click() # 点击当前答案，此时为0,即第一个选项
                 else:
                     assert cur_type == '多选'
                     # 类型，是否正确答案，当前选择答案（例：1111 表示全选）
                     ans_dic[i] = [1, 0, '1' * opt_counts]
                     for j, o in enumerate(ans_dic[i][2]):
                         if int(o):
-                            opt_elems[j].click()
+                            opt_elems[j].click() # 多选题，首先尝试全选所有选项
             else:  # 非第一轮答题
                 if ans_dic[i][1]:  # 上一轮答案正确
                     if ans_dic[i][0]:  # 多选
@@ -497,14 +504,18 @@ def do_exam():
                             int(ca.text) - 1 for ca in correct_answers]
                         for idx in correct_idx:
                             ans_dic[idx][1] = 1
+                    
+                    print(
+                        f'测试未通过（答对 {trial_num-wrong_answers_num}/{trial_num}），答案已记录，再次进行测试')
+                    
+                    print(f'记录答案：{ans_dic}')
+                    
                     driver.find_element(By.CSS_SELECTOR,
                                         'button[class="el-button exit el-button--default el-button--mini"]').click()  # 退出回看
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
-                    print(
-                        f'测试未通过（答对 {trial_num-wrong_answers_num}/{trial_num}），答案已记录，再次进行测试')
 
                     # all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
                     #     (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
@@ -566,9 +577,15 @@ get_credit_hours()
 
 # 学习课程
 while True:
-    info, course_status = get_course_to_learn()
-    learn_course(course_info=info, watch_video=course_status)
-
+    # 时间紧任务重，直接这么搞吧
+    try:
+        info, course_status = get_course_to_learn()
+        learn_course(course_info=info, watch_video=course_status)
+    except KeyboardInterrupt:
+        break
+    except:
+        sleep(10)
+        continue
 
 # 学习专题课程
 # while True:
