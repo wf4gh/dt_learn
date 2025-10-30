@@ -91,8 +91,11 @@ def get_course_to_learn():
 
     print('搜索当前页面未完成课程')
     while True:
-        # 观察发现课程列表可能延迟数秒，但会和页码及翻页键同时出现
-        # 此处等待向右翻页箭头出现
+        # 观察发现课程列表可能延迟数秒，或不出现，手动点击“全部”
+        WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+            (By.XPATH, "//span[@class='el-tree-node__label' and text()='全部']"))).click()
+        
+        # 等待向右翻页箭头出现
         next_button = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]')))
 
