@@ -547,6 +547,13 @@ chrome_options.add_argument("--mute-audio")
 
 # 打开浏览器
 driver = webdriver.Chrome(options=chrome_options)
+
+# 用于UOS，使用firefox时：
+# from selenium.webdriver.firefox.service import Service
+# # 指定geckodriver路径
+# service = Service('path_to/dt_learn/geckodriver36')
+# driver = webdriver.Firefox(service=service)
+
 driver.maximize_window()  # 窗口最大化
 
 # 以下页面操作
