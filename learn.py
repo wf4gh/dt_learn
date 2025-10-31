@@ -10,6 +10,18 @@ import re
 import sys
 import threading
 import pyautogui
+import logging
+import hashlib
+
+# 设置日志：同时输出到文件和控制台
+logging.basicConfig(
+    level=logging.debug,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("learn.log"),  # 输出到当前目录下的 log 文件
+        logging.StreamHandler()               # 同时输出到控制台，方便实时查看
+    ]
+)
 
 TIMEOUT_SEC = 10
 WAIT_LONGER_SEC = 30  # 尝试延长等待时间解决测试出现慢问题
@@ -369,9 +381,20 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
     print('此课程学习完成\n')
     update_credit_hours(course_info)
 
+'''
+2025-10-31发现题目、选项顺序会变！改为使用题干、题目选项的哈希
+ans_dic[i] = [0, 0, 0]  # {题目ID：[类型，是否正确答案，当前选择答案(index)]} <--------------------- 原 ans_dic 结构
+ans_dic[i] = [0, 0, 0]  # {题干哈希：[类型，是否正确答案，选项哈希（单选） | [多个选项哈希，保持顺序]（多选）]} <--------------------- 现 ans_dic 结构
+'''
+def gen_hash(text):
+    # 创建SHA-256哈希对象
+    hash_object = hashlib.sha256(text.encode('utf-8'))
+    # 返回十六进制格式的哈希值作为题目ID
+    return hash_object.hexdigest()
 
 def do_exam():
     # todo 某些课程可能需要手动点击进入测试
+    logging.debug('正在进入测试')
     while True:
         if 'examManage' in driver.current_url:
             break
@@ -393,7 +416,7 @@ def do_exam():
     # ).click()  # 随堂测试 确定
 
     sleep(.2) # 等待，提升稳定性
-
+    logging.debug('已进入测试')
     # 方案1：使用 javascript 进行点击
     button = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
         EC.visibility_of_element_located(
@@ -433,17 +456,29 @@ def do_exam():
                     (By.CSS_SELECTOR,
                     'div[class="options_wraper"]'))
             )
+        
+        all_trial_descriptions = WebDriverWait(driver, TIMEOUT_SEC).until(
+                EC.presence_of_all_elements_located(
+                    (By.CSS_SELECTOR,
+                    'div[class="examcontent"]'))
+            )
+
+        logging.debug(f'上轮记录答案：{ans_dic}')
+        
         for i in range(trial_num):
             options = all_trial_options[i]  # 当前题目选项组
+            sleep(.5)
             opt_elems = options.find_elements(By.CSS_SELECTOR,
                                               'label')  # 当前题目选项
             opt_counts = len(opt_elems)  # 当前题目选项数
+
+            logging.debug(f'当前解答第{i+1}题，共{opt_counts}个选项')
 
             if i not in ans_dic.keys():  # 第一轮答题
                 cur_type = ''.join([t.text for t in driver.find_elements(By.CSS_SELECTOR,
                                                                          'span[class="quest_tyle"]')])  # 当前题目类型 单选（判断）: 0 / 多选: 1
                 if cur_type in ['单选', '判断']:
-                    ans_dic[i] = [0, 0, 0]  # 类型，是否正确答案，当前选择答案(index)
+                    ans_dic[i] = [0, 0, 0]  # {题目ID：[类型，是否正确答案，当前选择答案(index)]} <--------------------- ans_dic 结构
                     opt_elems[ans_dic[i][2]].click() # 点击当前答案，此时为0,即第一个选项
                 else:
                     assert cur_type == '多选'
@@ -455,13 +490,16 @@ def do_exam():
             else:  # 非第一轮答题
                 if ans_dic[i][1]:  # 上一轮答案正确
                     if ans_dic[i][0]:  # 多选
+                        logging.debug(f'第{i+1}题，记录答案正确，多选，原记录选项：{ans_dic[i][2]}')
                         for j, o in enumerate(ans_dic[i][2]):
                             if int(o):
                                 opt_elems[j].click()
                     else:  # 单选
+                        logging.debug(f'第{i+1}题，记录答案正确，单选，记原录选项：{ans_dic[i][2]}')
                         opt_elems[ans_dic[i][2]].click()
                 else:  # 上一轮答案错误
                     if ans_dic[i][0]:  # 多选
+                        logging.debug(f'第{i+1}题，记录答案错误，多选，原记录选项：{ans_dic[i][2]}')
                         ans_dic[i][2] = bin(
                             int(ans_dic[i][2], 2) - 1)[2:].zfill(opt_counts)
                         for j, o in enumerate(ans_dic[i][2]):
@@ -469,6 +507,7 @@ def do_exam():
                                 sleep(.1)
                                 opt_elems[j].click()
                     else:  # 单选
+                        logging.debug(f'第{i+1}题，记录答案错误，单选，原记录选项：{ans_dic[i][2]}')
                         ans_dic[i][2] += 1
                         sleep(.1)
                         opt_elems[ans_dic[i][2]].click()
@@ -575,32 +614,25 @@ login()
 get_credit_hours()
 
 # ------------------------------------------------------
+
+
+
 # 时间紧任务重，直接这么搞吧
-import logging
-
-# 设置日志：同时输出到文件和控制台
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("learn.log"),  # 输出到当前目录下的 log 文件
-        logging.StreamHandler()               # 同时输出到控制台，方便实时查看
-    ]
-)
-
-while True:
-    try:
-        info, course_status = get_course_to_learn()
-        learn_course(course_info=info, watch_video=course_status)
-    except KeyboardInterrupt:
-        print("手动中断")
-        break
-    except Exception as e:
-        logging.error(f"处理课程时出现错误: {e}")  # 记录错误日志
-        sleep(10)
-        continue
-    logging.info('本轮成功执行')
-
+if __name__ == "__main__":
+    while True:
+        try:
+            info, course_status = get_course_to_learn()
+            learn_course(course_info=info, watch_video=course_status)
+        except KeyboardInterrupt:
+            print("手动中断")
+            break
+        except Exception as e:
+            logging.error(f"错误: {e}")  # 记录错误日志
+            sleep(10)
+            continue
+        logging.debug('本轮成功执行')
+        
+    
 # ------------------------------------------------------
 
 # 学习课程
