@@ -15,7 +15,7 @@ import hashlib
 
 # 设置日志：同时输出到文件和控制台
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.debug,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("learn.log"),  # 输出到当前目录下的 log 文件
@@ -383,21 +383,8 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
 
 '''
 2025-10-31发现题目、选项顺序会变！改为使用题干、题目选项的哈希
-ans_dic[i] = [0, 0, 0]  # {题目ID：[类型，是否正确答案，当前选择答案(index)]} 
-<--------------------- 原 ans_dic 结构
-现ans_dic 结构 ---------------------> 单选、多选统一此结构
-ans_dic = 
-{
-    h_1:{ 第一题题干文本哈希
-        'type':0, 0:单选/判断； 1：多选
-        o_1:1, 第一选项文本哈希:是否勾选
-        o_2:0,
-        o_3:0,
-        ...
-    },
-    h_2:{...}，
-    ...
-}  
+ans_dic[i] = [0, 0, 0]  # {题目ID：[类型，是否正确答案，当前选择答案(index)]} <--------------------- 原 ans_dic 结构
+ans_dic[i] = [0, 0, 0]  # {题干哈希：[类型，是否正确答案，选项哈希（单选） | [多个选项哈希，保持顺序]（多选）]} <--------------------- 现 ans_dic 结构
 '''
 def gen_hash(text):
     # 创建SHA-256哈希对象
@@ -405,37 +392,17 @@ def gen_hash(text):
     # 返回十六进制格式的哈希值作为题目ID
     return hash_object.hexdigest()
 
-def next_choice(dic):
-    # 创建新字典，保留'type'键值对
-    type = dic['type']
-    new_dict = {'type': type}
-    # 获取除'type'外的所有键（保持插入顺序）
-    hash_keys = [k for k in dic.keys() if k != 'type']
-    # 提取哈希键对应的值，组成二进制字符串
-    bin_str = ''.join(dic[k] for k in hash_keys)
-    
-    if not type: # 单选/判断：对二进制字符串进行右移一位操作
-        new_bin_str = '0' + bin_str[:-1]
-    else: # 多选：
-        new_bin_str = bin((int(bin_str, 2) -1))[2:].zfill(len(dic.keys())-1)
-
-    # 将新的二进制值分配回对应的哈希键
-    for i, key in enumerate(hash_keys):
-        new_dict[key] = new_bin_str[i]
-    return new_dict
-
-
 def do_exam():
     logging.debug('正在进入测试')
     
     while True: # 用于解决：某些课程可能需要手动点击进入测试；进入测试后可能页面空白
         if 'examManage' in driver.current_url:
-            question_status = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
+            trial_status = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
                 EC.visibility_of_element_located(
                     (By.CSS_SELECTOR,
                     'div[class="top_e"]'))
             )
-            if question_status == '1/0':
+            if trial_status == '1/0':
                 logging.error('出现测试页面空白，尝试重进')
                 driver.back()
                 continue
@@ -455,7 +422,7 @@ def do_exam():
     logging.debug('已进入测试')
     
 
-    # 获取进入测试页面后的“确定”按钮
+    
     button = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
         EC.visibility_of_element_located(
             (By.CSS_SELECTOR,
@@ -465,130 +432,148 @@ def do_exam():
 
     driver.execute_script("arguments[0].click();", button) # 使用 javascript 点击 确定
 
+    ans_dic = {}  # 答案字典    
     
 
-    question_num = int(driver.find_element(By.CSS_SELECTOR,
+    trial_num = int(driver.find_element(By.CSS_SELECTOR,
                                         'div[class="top_e"] div').text.split('/')[1])  # 题目数
-    logging.debug(f'进入测试，共 {question_num} 题')
+    logging.debug(f'进入测试，共 {trial_num} 题')
 
-    question_type_map = {
-        '单选':0,
-        '判断':0,
-        '多选':1
-    }
 
-    ans_dic = {}  # 答案字典    
     while True:
         # 获取所有 下一题/交卷 按钮
         # 此处获取了所有 上一题 / 下一题 /交卷，筛选出偶数项
         next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
-
-        all_questions = [] # 所有题目的题干、选项
-        while not len(all_questions): # 等待题目完全显示
+        
+        # all_trial_options = driver.find_elements(By.CSS_SELECTOR,
+        #                                          'div[class="options_wraper"]')  # 获取所有题目选项组
+        
+        all_trial_options = []
+        while not len(all_trial_options):
             sleep(.2)
-            all_questions = WebDriverWait(driver, TIMEOUT_SEC).until(
+            all_trial_options = WebDriverWait(driver, TIMEOUT_SEC).until(
+                EC.presence_of_all_elements_located(
+                    (By.CSS_SELECTOR,
+                    'div[class="options_wraper"]'))
+            )
+        
+        all_trials = [] # 所有题目的题干、选项
+        while not len(all_trials):
+            sleep(.2)
+            all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(
                     EC.presence_of_all_elements_located(
                         (By.CSS_SELECTOR,
                         'div[class="examcontent"]'))
                 )
-        assert len(all_questions) == question_num
         
-        current_stem_hashes = [] # 用于顺序存储此轮题目哈希
+        for trial in all_trials: # 将all_trials的题干、选项做哈希，存到ans_dic里
+            pass
 
-        # TODO:这里输出ans_dic看看！！！，似乎有死循环
+        logging.debug(f'上轮记录答案：{ans_dic}')
+        
+        for i in range(trial_num):
+            options = all_trial_options[i]  # 当前题目选项组
+            sleep(.5)
+            opt_elems = options.find_elements(By.CSS_SELECTOR,
+                                              'label')  # 当前题目选项
+            opt_counts = len(opt_elems)  # 当前题目选项数
 
-        # 遍历处理每个题目
-        for i, q in enumerate(all_questions): # 将all_questions的题干、选项做哈希，存到ans_dic里
-            sleep(.2)
-            # q文本："1. 单选 题干XXX \nA aaa \nB bbb ..."
-            question_elem = q.find_elements(By.CSS_SELECTOR,'div') # 注意到 q包含两个div，其一是题干，其二是各选项
-            
-            # 获取类型、题干
-            question_stem_text = question_elem[0].text.split('. ', maxsplit=1)[1] #题干，去掉题号
-            question_type, question_stem_text = question_stem_text.split(' ', maxsplit=1) #去掉类型（单选多选判断）
-            
-            # 获取选项元素及文本
-            question_opts_elems = question_elem[1].find_elements(By.CSS_SELECTOR, 'label')
-            question_opts_texts = [opt_elem.text.split(' ', maxsplit=1)[1] for opt_elem in question_opts_elems]
-            
-            # 求哈希
-            stem_hash = gen_hash(question_stem_text)
-            opts_hash = list(map(gen_hash, question_opts_texts))
+            logging.debug(f'当前解答第{i+1}题，共{opt_counts}个选项')
 
-            current_stem_hashes.append(stem_hash)
-            
-            # ans_dic 初次写入信息
-            if stem_hash not in ans_dic.keys():
-                # 组 ans_dic
-                type = question_type_map[question_type]
-                opts_num = len(opts_hash) # 选项个数
-                if type: # 多选：
-                    target_opts = '1'*opts_num # 如：1111
+            if i not in ans_dic.keys():  # 第一轮答题
+                cur_type = ''.join([t.text for t in driver.find_elements(By.CSS_SELECTOR,
+                                                                         'span[class="quest_tyle"]')])  # 当前题目类型 单选（判断）: 0 / 多选: 1
+                if cur_type in ['单选', '判断']:
+                    ans_dic[i] = [0, 0, 0]  # {题目ID：[类型，是否正确答案，当前选择答案(index)]} <--------------------- ans_dic 结构
+                    opt_elems[ans_dic[i][2]].click() # 点击当前答案，此时为0,即第一个选项
                 else:
-                    target_opts = '1'+'0'*(opts_num-1) # 如：1000
-                # 合并字典
-                ans_dic[stem_hash] = {'type':type} | dict(zip(opts_hash, target_opts))
-
-                '''
-                得到：
-                {'9db0ce813371d0d4a75ea95c6e55e77e07bdc9b0da79b2ca45142aefd379c043':
-                    {
-                    'type': 0,
-                    '0f7a70afb531985b0718ed3f46bc40e7aa1650951a4dd783f2c708cb2de5669c': '1',
-                    'b989d4997af33924612ce7165fa3a685e798f823b985b4ae388a76cc3803a950': '0',
-                    'd18c75fe308263bbd57346698246a7bb568bd12555e792aa68d1bceaa7a317e6': '0',
-                    'ac6879236e5c0fa112468b2b4edf3df8b0dc0f3189aacae7d7cb00c218cff10e': '0'}
-                    }
-                '''
-            
-            # 遍历每个选项 判断是否勾选
-            for j, opt_elem in enumerate(question_opts_elems):
-                toCheck = int(ans_dic[stem_hash][gen_hash(question_opts_texts[j])])
-                if toCheck:
-                    sleep(.2)
-                    opt_elem.click()
-
-            logging.debug(f'next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）{i}')
-            assert next_n_submit_buttons[i].text != ''
+                    assert cur_type == '多选'
+                    # 类型，是否正确答案，当前选择答案（例：1111 表示全选）
+                    ans_dic[i] = [1, 0, '1' * opt_counts]
+                    for j, o in enumerate(ans_dic[i][2]):
+                        if int(o):
+                            opt_elems[j].click() # 多选题，首先尝试全选所有选项
+            else:  # 非第一轮答题
+                if ans_dic[i][1]:  # 上一轮答案正确
+                    if ans_dic[i][0]:  # 多选
+                        logging.debug(f'第{i+1}题，记录答案正确，多选，原记录选项：{ans_dic[i][2]}')
+                        for j, o in enumerate(ans_dic[i][2]):
+                            if int(o):
+                                opt_elems[j].click()
+                    else:  # 单选
+                        logging.debug(f'第{i+1}题，记录答案正确，单选，记原录选项：{ans_dic[i][2]}')
+                        opt_elems[ans_dic[i][2]].click()
+                else:  # 上一轮答案错误
+                    if ans_dic[i][0]:  # 多选
+                        logging.debug(f'第{i+1}题，记录答案错误，多选，原记录选项：{ans_dic[i][2]}')
+                        ans_dic[i][2] = bin(
+                            int(ans_dic[i][2], 2) - 1)[2:].zfill(opt_counts)
+                        for j, o in enumerate(ans_dic[i][2]):
+                            if int(o):
+                                sleep(.1)
+                                opt_elems[j].click()
+                    else:  # 单选
+                        logging.debug(f'第{i+1}题，记录答案错误，单选，原记录选项：{ans_dic[i][2]}')
+                        ans_dic[i][2] += 1
+                        sleep(.1)
+                        opt_elems[ans_dic[i][2]].click()
+            sleep(.5)
             next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）
-            if i == question_num - 1:
-                try: # 解决可能不点击 交卷 的问题
+            if i == trial_num - 1:
+                # 解决可能不点击 交卷 的问题
+                try:
                     sleep(.5)
                     next_n_submit_buttons[i].click()
                 except:
-                    logging.debug('已点击 交卷')
-                
+                    logging.debug('已点击 交卷')                
+
                 WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()  # 交卷 确定
 
                 result_info = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'div[class="infoclass"]'))).text  # 获取测试结果
-                
-                if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格，回看试题
+
+                if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()
-                    
-                    # 获取错误题目
+                        (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()  # 回看试题
+
+                    # 因为通过测试，肯定有打错的，此处先处理所有题目全部答错的情况
+                    # 全部答错的情况下，直接尝试获取正确题目为空，超时报错
                     wrong_answers = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
                         EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess isred"]')))
-                    wrong_answer_idx = [int(a.text)-1 for a in wrong_answers] # 错题 idx
-                    for i in wrong_answer_idx: # 处理错题
-                        # 某题做错，需把这题的答案 右移（单选） 或 减一（多选）
-                        # 不必管选项顺序，选项是按哈希点的，此处只处理：“题错了，调整为下一选项” 就可以了
-                        # 但需要对应到相应的题目上
-                        ans_dic[current_stem_hashes[i]] = next_choice(ans_dic[current_stem_hashes[i]])
-
+                    wrong_answers_num = len(wrong_answers)
+                    if not wrong_answers_num == trial_num:
+                        correct_answers = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
+                            EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess"]')))
+                        correct_idx = [
+                            int(ca.text) - 1 for ca in correct_answers]
+                        for idx in correct_idx:
+                            ans_dic[idx][1] = 1
+                    
+                    logging.debug(
+                        f'测试未通过（答对 {trial_num-wrong_answers_num}/{trial_num}），答案已记录，再次进行测试')
+                    
+                    logging.debug(f'记录答案：{ans_dic}')
+                    
                     driver.find_element(By.CSS_SELECTOR,
                                         'button[class="el-button exit el-button--default el-button--mini"]').click()  # 退出回看
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
+
+                    # all_trials = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
+                    #     (By.CSS_SELECTOR, 'div[class="scroll_content"]')))  # 重新获取所有题目 题干、选项、按钮
+                    
+                    # 重新获取一次
+                    # next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
+
                 else:
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn exitBtn  el-button--primary el-button--mini"]'))).click()  # 通过测试，退出
                     logging.debug('通过测试')
                     return
+
 
 # 每5分移动一次鼠标，避免系统休眠或关机
 def prevent_sleep():
