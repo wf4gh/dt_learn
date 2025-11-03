@@ -37,7 +37,7 @@ def login():
     redirect_url = 'https://gbwlxy.dtdjzx.gov.cn/oauth2/login/pro'
 
     driver.get(login_url)
-    logging.debug('等待登录(300秒)')
+    logging.info('等待登录(300秒)')
 
     # TODO: 此元素可能不出现，有可能登陆后出个半页。看情况改成等待其他东西
     WebDriverWait(driver, 300).until(EC.presence_of_element_located(
@@ -45,7 +45,7 @@ def login():
     # 经跳转页面进入index主页
     driver.get(redirect_url)
 
-    logging.debug('已登录')
+    logging.info('已登录')
 
 
 finished_hours = 0.0
@@ -78,7 +78,7 @@ def get_credit_hours():
     target_hours = float(re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0])
     finished_hours = float(re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0])
 
-    logging.debug(f'当前进度（精确）：{finished_hours}/{target_hours}学时')
+    logging.info(f'当前进度（精确）：{finished_hours}/{target_hours}学时')
 
 
 # 每次学完一课，计算学时
@@ -87,15 +87,15 @@ def update_credit_hours(course_info):
     global target_hours
 
     finished_hours += float(course_info[3])
-    logging.debug(f'当前进度（估计）：{finished_hours}/{target_hours}学时')
+    logging.info(f'当前进度（估计）：{finished_hours}/{target_hours}学时')
     if finished_hours >= target_hours:
-        logging.debug('学时可能已完成，将打开个人中心确认精确进度')
+        logging.info('学时可能已完成，将打开个人中心确认精确进度')
         get_credit_hours()
         if finished_hours >= target_hours:
-            logging.debug('学时已完成，程序退出')
+            logging.info('学时已完成，程序退出')
             sys.exit(0)
         else:
-            logging.debug('学时未完成，继续学习')
+            logging.info('学时未完成，继续学习')
 
 
 def get_course_to_learn():
@@ -103,7 +103,7 @@ def get_course_to_learn():
 
     driver.get(courses_url)
 
-    logging.debug('搜索当前页面未完成课程')
+    logging.info('搜索当前页面未完成课程')
     
     # 观察发现课程列表可能延迟数秒，或不出现，手动点击“全部”
     WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
@@ -132,15 +132,15 @@ def get_course_to_learn():
                 info = [course_name, course_progress,
                         course_duration, course_credit_hours]
                 if course_progress == '未通过考试':
-                    logging.debug(f'准备 {course_name} 测试')
+                    logging.info(f'准备 {course_name} 测试')
                     return info, False  # 是否需要视频学习
                 else:
-                    logging.debug(
+                    logging.info(
                         f'准备学习 {course_name}，时长{course_duration}，学时{course_credit_hours}')
                     return info, True  # 是否需要视频学习
 
         # for循环运行结束，表明当前页面所有课程已学习，点击 “>” 下一页
-        logging.debug('当前页面所有课程已学习，进入下一页搜索')
+        logging.info('当前页面所有课程已学习，进入下一页搜索')
         next_button.click()
 
 # sub_idx_to_learn：在“正在举办”页中学习第几个专题（0，1，2。。。） # TODO 翻页
@@ -186,15 +186,15 @@ def get_subject_course_to_learn(subject_url=None):
 
     if subject_url is None:
         subject_to_learn.click()
-        logging.debug('调用get_subject_course_to_learn,未指定subject_url')
+        logging.info('调用get_subject_course_to_learn,未指定subject_url')
     else:
         driver.get(subject_url)
-        logging.debug('调用get_subject_course_to_learn,指定subject_url')
+        logging.info('调用get_subject_course_to_learn,指定subject_url')
 
     sleep(2)
     next_button = WebDriverWait(driver, TIMEOUT_SEC).until(
         EC.visibility_of_element_located((By.CSS_SELECTOR, 'button[class="btn-next"]')))
-    logging.debug('获取‘下一页’按钮')
+    logging.info('获取‘下一页’按钮')
 
     is_compulsory = True  # 默认进入必修课程
     # while not next_button.is_enabled():
@@ -214,23 +214,23 @@ def get_subject_course_to_learn(subject_url=None):
         By.CSS_SELECTOR, 'li[class="number active"]').text)
 
     while cur_active <= page_cnt:
-        logging.debug(f'当前课程页数：{cur_active}/{page_cnt}')
+        logging.info(f'当前课程页数：{cur_active}/{page_cnt}')
         sleep(1)
         courses = WebDriverWait(driver, TIMEOUT_SEC).until(EC.presence_of_all_elements_located(
             # (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ） # 网站更新？
             # (By.CSS_SELECTOR, 'div[class="course-list-item-message active"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
             (By.CSS_SELECTOR, 'div[class="course-list-item"]')))  # 已学\未学课程CSS_SELECTOR似乎不同，使用上级selector
         valid_courses = [c for c in courses if c.text != '']
-        # logging.debug(len(valid_courses))
+        # logging.info(len(valid_courses))
         for c in valid_courses:
             if c.text[-3:] != '已学习':
                 page_to_learn = c.find_element(By.CSS_SELECTOR, 'h2')
                 course_name = c.text.split('\n')[1]  # 获取课程名
                 if c.text[-3:] == '过考试':
-                    logging.debug(f'准备 {course_name} 测试')
+                    logging.info(f'准备 {course_name} 测试')
                     return False  # 是否需要视频学习
                 else:
-                    logging.debug(f'准备学习 {course_name}')
+                    logging.info(f'准备学习 {course_name}')
                     return True  # 是否需要视频学习
 
         if is_compulsory and (not next_button.is_enabled()):  # 必修课程遍历完毕，进入选修课程
@@ -238,7 +238,7 @@ def get_subject_course_to_learn(subject_url=None):
                 By.XPATH, '//p[text()="选修课程"]').click()
             is_compulsory = False
             assert next_button.is_enabled()
-        logging.debug('当前页面所有课程已学习，进入下一页搜索')
+        logging.info('当前页面所有课程已学习，进入下一页搜索')
         next_button.click()
         sleep(.5)
         cur_active = int(driver.find_element(By.CSS_SELECTOR,
@@ -272,23 +272,23 @@ def get_special_course_to_learn():
         courses = WebDriverWait(driver, TIMEOUT_SEC).until(EC.presence_of_all_elements_located(
             (By.CSS_SELECTOR, 'div[class="class-card gestures "]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
         valid_courses = [c for c in courses if c.text != '']
-        # logging.debug(len(valid_courses))
+        # logging.info(len(valid_courses))
         for c in valid_courses:
             if c.text.split('\n')[2] != '已学习':
                 page_to_learn = c.find_element(
                     By.CSS_SELECTOR, 'div[class="top-title"]')
                 course_name = c.text.split('\n')[1]
                 if c.text.split('\n')[2] == '未通过考试':
-                    logging.debug(f'准备 {course_name} 测试')
+                    logging.info(f'准备 {course_name} 测试')
                     return False  # 是否需要视频学习
                 else:
-                    logging.debug(f'准备学习 {course_name}')
+                    logging.info(f'准备学习 {course_name}')
                     return True  # 是否需要视频学习
         next_button.click()
         sleep(.5)
         cur_active = int(driver.find_element(By.CSS_SELECTOR,
                                              'li[class="number active"]').text)
-        logging.debug('当前页面所有课程已学习，进入下一页搜索')
+        logging.info('当前页面所有课程已学习，进入下一页搜索')
 
 
 def learn_course(course_info=None, watch_video=True, is_subject_course=False):
@@ -349,7 +349,7 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
                 played_duration[1] * 60 + played_duration[2]
         else:
             played_dur_sec = played_duration[0] * 60 + played_duration[1]
-        logging.debug(
+        print(
             f'\r视频播放中 {played_duration_text} / {total_duration_text}', end='', flush=True)
 
     # 判断是否有随堂测试
@@ -360,11 +360,11 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         if has_test in ['是', '否']:
             break
         else:
-            logging.debug(f'\r尝试获取测试信息：has_test->{has_test}', end='', flush=True)
+            print(f'\r尝试获取测试信息：has_test->{has_test}', end='', flush=True)
         sleep(.2)
     
     
-    logging.debug('\n等待播放结束')
+    logging.info('\n等待播放结束')
     
     if has_test == '是':
         sleep(5) # 确保视频播放完
@@ -378,7 +378,7 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         driver.close()
         driver.switch_to.window(driver.window_handles[0])
 
-    logging.debug('此课程学习完成\n')
+    logging.info('此课程学习完成\n')
     update_credit_hours(course_info)
 
 '''
@@ -426,7 +426,7 @@ def next_choice(dic):
 
 
 def do_exam():
-    logging.debug('正在进入测试')
+    logging.info('正在进入测试')
     
     while True: # 用于解决：某些课程可能需要手动点击进入测试；进入测试后可能页面空白
         if 'examManage' in driver.current_url:
@@ -452,7 +452,7 @@ def do_exam():
             raise
     
     sleep(.2) # 等待，提升稳定性
-    logging.debug('已进入测试')
+    logging.info('已进入测试')
     
 
     # 获取进入测试页面后的“确定”按钮
@@ -469,7 +469,7 @@ def do_exam():
 
     question_num = int(driver.find_element(By.CSS_SELECTOR,
                                         'div[class="top_e"] div').text.split('/')[1])  # 题目数
-    logging.debug(f'进入测试，共 {question_num} 题')
+    logging.info(f'进入测试，共 {question_num} 题')
 
     question_type_map = {
         '单选':0,
@@ -548,7 +548,7 @@ def do_exam():
                     sleep(.2)
                     opt_elem.click()
 
-            logging.debug(f'next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）{i}')
+            logging.info(f'next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）{i}')
             assert next_n_submit_buttons[i].text != ''
             next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）
             if i == question_num - 1:
@@ -556,7 +556,7 @@ def do_exam():
                     sleep(.5)
                     next_n_submit_buttons[i].click()
                 except:
-                    logging.debug('已点击 交卷')
+                    logging.info('已点击 交卷')
                 
                 WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()  # 交卷 确定
@@ -587,7 +587,7 @@ def do_exam():
                 else:
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn exitBtn  el-button--primary el-button--mini"]'))).click()  # 通过测试，退出
-                    logging.debug('通过测试')
+                    logging.info('通过测试')
                     return
 
 # 每5分移动一次鼠标，避免系统休眠或关机
@@ -645,13 +645,13 @@ if __name__ == "__main__":
             info, course_status = get_course_to_learn()
             learn_course(course_info=info, watch_video=course_status)
         except KeyboardInterrupt:
-            logging.debug("手动中断")
+            logging.info("手动中断")
             break
         except Exception as e:
             logging.error(f"错误: {e}")  # 记录错误日志
             sleep(10)
             continue
-        logging.debug('本轮成功执行')
+        logging.info('本轮成功执行')
         
     
 # ------------------------------------------------------
