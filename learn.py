@@ -363,8 +363,8 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
             print(f'\r尝试获取测试信息：has_test->{has_test}', end='', flush=True)
         sleep(.2)
     
-    
-    logging.info('\n等待播放结束')
+    print('\n')
+    logging.info('等待播放结束')
     
     if has_test == '是':
         sleep(5) # 确保视频播放完
@@ -388,7 +388,8 @@ ans_dic[i] = [0, 0, 0]  # {题目ID：[类型，是否正确答案，当前选�
 现ans_dic 结构 ---------------------> 单选、多选统一此结构
 ans_dic = 
 {
-    h_1:{ 第一题题干文本哈希
+    h_1: 第一题题干文本哈希
+    { 
         'type':0, 0:单选/判断； 1：多选
         o_1:1, 第一选项文本哈希:是否勾选
         o_2:0,
@@ -436,7 +437,7 @@ def do_exam():
                     'div[class="top_e"]'))
             )
             if question_status == '1/0':
-                logging.error('出现测试页面空白，尝试重进')
+                logging.warning('出现测试页面空白，尝试重进')
                 driver.back()
                 continue
             break
@@ -495,7 +496,12 @@ def do_exam():
         
         current_stem_hashes = [] # 用于顺序存储此轮题目哈希
 
-        # TODO:这里输出ans_dic看看！！！，似乎有死循环
+        if ans_dic: # 不为空，则非第一轮
+            ans_dic_lst = list(ans_dic.values())
+            ans_dic_value_lst = [''.join(map(str,list(i.values()))) for i in ans_dic_lst]
+            logging.info(f'非第一轮答题，尝试答案：{ans_dic_value_lst}')
+        else:
+            logging.info(f'第一轮答题，尝试默认答案')
 
         # 遍历处理每个题目
         for i, q in enumerate(all_questions): # 将all_questions的题干、选项做哈希，存到ans_dic里
@@ -548,25 +554,28 @@ def do_exam():
                     sleep(.2)
                     opt_elem.click()
 
-            logging.info(f'next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）{i}')
+            # logging.info(f'next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）
             assert next_n_submit_buttons[i].text != ''
             next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）
             if i == question_num - 1:
                 try: # 解决可能不点击 交卷 的问题
                     sleep(.5)
-                    next_n_submit_buttons[i].click()
+                    next_n_submit_buttons[i].click() # 尝试再点一次
                 except:
-                    logging.info('已点击 交卷')
+                    logging.info('答案已提交') #如果出现异常，说明已点击 交卷
                 
                 WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()  # 交卷 确定
 
                 result_info = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                     (By.CSS_SELECTOR, 'div[class="infoclass"]'))).text  # 获取测试结果
+                logging.info('获取测试结果')
                 
                 if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格，回看试题
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()
+                    
+                    logging.info('未通过测试，进入回看记录答案')
                     
                     # 获取错误题目
                     wrong_answers = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
@@ -584,6 +593,7 @@ def do_exam():
                         (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
+                    logging.info('退出回看，重新测试')
                 else:
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn exitBtn  el-button--primary el-button--mini"]'))).click()  # 通过测试，退出
@@ -591,6 +601,7 @@ def do_exam():
                     return
 
 # 每5分移动一次鼠标，避免系统休眠或关机
+# 不确定这东西管不管用……先放着吧
 def prevent_sleep():
     while True:
         # 移动鼠标一个像素并移回原位
@@ -639,19 +650,19 @@ get_credit_hours()
 
 
 # 时间紧任务重，直接这么搞吧
-if __name__ == "__main__":
-    while True:
-        try:
-            info, course_status = get_course_to_learn()
-            learn_course(course_info=info, watch_video=course_status)
-        except KeyboardInterrupt:
-            logging.info("手动中断")
-            break
-        except Exception as e:
-            logging.error(f"错误: {e}")  # 记录错误日志
-            sleep(10)
-            continue
-        logging.info('本轮成功执行')
+# if __name__ == "__main__":
+#     while True:
+#         try:
+#             info, course_status = get_course_to_learn()
+#             learn_course(course_info=info, watch_video=course_status)
+#         except KeyboardInterrupt:
+#             logging.info("手动中断")
+#             break
+#         except Exception as e:
+#             logging.error(f"错误: {e}")  # 记录错误日志
+#             sleep(10)
+#             continue
+#         logging.info('本轮成功执行\n')
         
     
 # ------------------------------------------------------
