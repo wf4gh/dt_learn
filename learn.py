@@ -83,21 +83,16 @@ def goto_route(route, expect_css=None, retries=4):
 
 # 登陆
 def login():
+    login_url = 'https://sso.dtdjzx.gov.cn/sso/login'
+    redirect_url = f'{BASE}/index'
 
-    driver.get(LOGIN_URL)
+    driver.get(login_url)
     logging.info('等待登录(300秒)')
-
-    # 页面改动了，此判断失效
-    # WebDriverWait(driver, 300).until(EC.presence_of_element_located(
-    #     (By.CSS_SELECTOR, f'a[href="{redirect_url}"]')))
-
-    # 新判断
-    WebDriverWait(driver, 300).until(EC.presence_of_element_located(
-        (By.CSS_SELECTOR, f'div.item-right')))
-
-    # 经跳转页面进入index主页
-    driver.get(REDIRECT_URL)
-
+    WebDriverWait(driver, 300).until(
+        EC.presence_of_element_located((By.CSS_SELECTOR, 'div.item-right')))
+    sleep(1)                     # 让扫码后的跳转动作先走起来
+    driver.get(redirect_url)
+    wait_url_stable()            # ← 关键：URL 稳定 2 秒才算登录完成
     logging.info('已登录')
 
 
@@ -105,33 +100,24 @@ finished_hours = 0.0
 target_hours = 0.0
 
 # 页面获取当前学时信息
-
-
 def get_credit_hours():
-    logging.info('尝试获取学时')
-    global finished_hours
-    global target_hours
+    global finished_hours, target_hours
 
-    personal_center_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/personalCenter'
-    driver.get(personal_center_url)
+    goto_route('/personalCenter', expect_css='div.plan-pro')
 
-    # 解决抓取过快获取总学时为0的问题
-    target_hours = 0
-    while not target_hours:
+    # 解决抓取过快获取总学时为0的问题（加个次数上限，避免''死循环）
+    target_text = ''
+    for _ in range(50):
+        target_text = WebDriverWait(driver, TIMEOUT_SEC).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-pro"))).text
+        finished_text = WebDriverWait(driver, TIMEOUT_SEC).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))).text
+        if target_text:
+            break
         sleep(.1)
-        # 获取总学时
-        target_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-pro"))
-        ).text
-        # 获取已完成学时
-        finished_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))
-        ).text
 
-    # 整理输出
-    target_hours = float(re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0])
-    finished_hours = float(re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0])
-
+    target_hours = float(re.findall(r'(\d+(\.\d+)?)', target_text)[0][0])
+    finished_hours = float(re.findall(r'(\d+(\.\d+)?)', finished_text)[0][0])
     logging.info(f'当前进度（精确）：{finished_hours}/{target_hours}学时')
 
 
@@ -746,9 +732,9 @@ get_credit_hours()
 # ------------------------------------------------------
 
 # 学习课程
-# while True:
-#     info, course_status = get_course_to_learn()
-#     learn_course(course_info=info, watch_video=course_status)
+while True:
+    info, course_status = get_course_to_learn()
+    learn_course(course_info=info, watch_video=course_status)
 
 # 学习专题课程
 # while True:
