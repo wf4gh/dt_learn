@@ -12,6 +12,8 @@ import threading
 import pyautogui
 import logging
 import hashlib
+import time
+from selenium.common.exceptions import TimeoutException
 
 # 设置日志：同时输出到文件和控制台
 logging.basicConfig(
@@ -26,24 +28,75 @@ logging.basicConfig(
 TIMEOUT_SEC = 10
 WAIT_LONGER_SEC = 30  # 尝试延长等待时间解决测试出现慢问题
 
-courses_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/commendIndex'  # 课程
-subjects_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/projectIndex'  # 专题
-specials_url = 'https://gbwlxy.dtdjzx.gov.cn/content#/specialReList'  # 专栏
+BASE = 'https://gbwlxy.dtdjzx.gov.cn'
+CONTENT_URL = BASE + '/content'
+
+COURSES_URL = CONTENT_URL + '#/commendIndex'  # 课程
+SUBJECTS_URL = CONTENT_URL + '#/projectIndex'  # 专题
+SPECIALS_URL = CONTENT_URL + '#/specialReList'  # 专栏
+
+LOGIN_URL = 'https://sso.dtdjzx.gov.cn/sso/login'
+# redirect_url = 'https://gbwlxy.dtdjzx.gov.cn/oauth2/login/pro' # 旧版
+REDIRECT_URL = 'https://gbwlxy.dtdjzx.gov.cn/index'
+
+def wait_url_stable(timeout=30, need_stable=2.0):
+    """等 current_url 连续 need_stable 秒不再变化，且不在 sso 域名下"""
+    end = time.time() + timeout
+    last_url, stable_since = None, time.time()
+    while time.time() < end:
+        url = driver.current_url
+        if url != last_url:
+            last_url, stable_since = url, time.time()
+        elif 'sso.dtdjzx.gov.cn' not in url and time.time() - stable_since >= need_stable:
+            logging.info(f'页面已稳定：{url}')
+            return url
+        sleep(.3)
+    raise TimeoutException(f'页面迟迟未稳定：{driver.current_url}')
+
+def goto_route(route, expect_css=None, retries=4):
+    """进入 SPA 的 hash 路由；被路由守卫弹回主页则重试。
+    route:      '/personalCenter'
+    expect_css: 该路由下必现的元素，用来确认真的到位
+    """
+    url = f'{CONTENT_URL}#{route}'
+    for attempt in range(1, retries + 1):
+        if attempt == 1:
+            driver.get(url)                     # 同文档 hash 跳转，快
+        else:
+            driver.get('about:blank')           # 强制整页重新加载，绕开守卫竞态
+            driver.get(url)
+        try:
+            WebDriverWait(driver, TIMEOUT_SEC).until(lambda d: route in d.current_url)
+            sleep(1)                            # 留出被异步弹回的时间窗
+            if route not in driver.current_url:
+                raise TimeoutException('被重定向走了')
+            if expect_css:
+                WebDriverWait(driver, TIMEOUT_SEC).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, expect_css)))
+            return
+        except TimeoutException:
+            logging.warning(f'进入 {route} 失败（第{attempt}次），'
+                            f'当前 URL={driver.current_url}')
+            sleep(.5)
+    raise TimeoutException(f'多次尝试后仍无法进入 {route}')
 
 
 # 登陆
 def login():
-    login_url = 'https://sso.dtdjzx.gov.cn/sso/login'
-    redirect_url = 'https://gbwlxy.dtdjzx.gov.cn/oauth2/login/pro'
 
-    driver.get(login_url)
+    driver.get(LOGIN_URL)
     logging.info('等待登录(300秒)')
 
-    # TODO: 此元素可能不出现，有可能登陆后出个半页。看情况改成等待其他东西
+    # 页面改动了，此判断失效
+    # WebDriverWait(driver, 300).until(EC.presence_of_element_located(
+    #     (By.CSS_SELECTOR, f'a[href="{redirect_url}"]')))
+
+    # 新判断
     WebDriverWait(driver, 300).until(EC.presence_of_element_located(
-        (By.CSS_SELECTOR, f'a[href="{redirect_url}"]')))
+        (By.CSS_SELECTOR, f'div.item-right')))
+
     # 经跳转页面进入index主页
-    driver.get(redirect_url)
+    driver.get(REDIRECT_URL)
 
     logging.info('已登录')
 
@@ -55,6 +108,7 @@ target_hours = 0.0
 
 
 def get_credit_hours():
+    logging.info('尝试获取学时')
     global finished_hours
     global target_hours
 
@@ -73,7 +127,7 @@ def get_credit_hours():
         finished_hours = WebDriverWait(driver, TIMEOUT_SEC).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, "div.plan-all-y"))
         ).text
-        
+
     # 整理输出
     target_hours = float(re.findall(r'(\d+(\.\d+)?)', target_hours)[0][0])
     finished_hours = float(re.findall(r'(\d+(\.\d+)?)', finished_hours)[0][0])
@@ -101,21 +155,21 @@ def update_credit_hours(course_info):
 def get_course_to_learn():
     global page_to_learn
 
-    driver.get(courses_url)
+    driver.get(COURSES_URL)
 
     logging.info('搜索当前页面未完成课程')
-    
+
     # 观察发现课程列表可能延迟数秒，或不出现，手动点击“全部”
     WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
         (By.XPATH, "//span[@class='el-tree-node__label' and text()='全部']"))).click()
-    
+
     while True:
         # 等待向右翻页箭头出现
         next_button = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
             (By.CSS_SELECTOR, 'i[class="el-icon el-icon-arrow-right"]')))
 
         sleep(.1)
-        
+
         # 获取（等待）当前页面课程
         course_elems = WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_all_elements_located(
             (By.CSS_SELECTOR, 'div[class="video-warp-start"]')))
@@ -148,7 +202,7 @@ def get_course_to_learn():
 
 def to_subject(sub_idx_to_learn=None):
     sleep(1)
-    driver.get(subjects_url)  # 进入 专题 页面
+    driver.get(SUBJECTS_URL)  # 进入 专题 页面
 
     # WebDriverWait(driver, TIMEOUT_SEC).until(EC.visibility_of_element_located(
     #     (By.XPATH, '//p[text()="正在举办"]'))).click()  # 确保进入 正在举办 tab
@@ -161,7 +215,8 @@ def to_subject(sub_idx_to_learn=None):
     # subjects = cur_tab_elem.find_elements(By.CSS_SELECTOR,'div[class="course-list-item-message"]') # 获取课程信息
     if sub_idx_to_learn is None:
         subjects_status = [s.find_elements(By.XPATH,
-                                           'p')[1].text.split('\n')[-1] for s in subjects]  # 课程报名状态
+                                           # 课程报名状态
+                                           'p')[1].text.split('\n')[-1] for s in subjects]
         attended_idx = subjects_status.index('已报名')  # 学习 已报名
     else:
         attended_idx = sub_idx_to_learn
@@ -172,7 +227,7 @@ def to_subject(sub_idx_to_learn=None):
 
 def to_special(sub_idx_to_learn=None):
     sleep(1)
-    driver.get(specials_url)  # 进入 专栏 页面
+    driver.get(SPECIALS_URL)  # 进入 专栏 页面
     sleep(1)
     subjects = WebDriverWait(driver, TIMEOUT_SEC).until(EC.presence_of_all_elements_located(
         (By.CSS_SELECTOR, 'div[class="specialCard gestures"]')))  # 获取课程信息
@@ -219,7 +274,8 @@ def get_subject_course_to_learn(subject_url=None):
         courses = WebDriverWait(driver, TIMEOUT_SEC).until(EC.presence_of_all_elements_located(
             # (By.CSS_SELECTOR, 'div[class="course-list-item-message"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ） # 网站更新？
             # (By.CSS_SELECTOR, 'div[class="course-list-item-message active"]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
-            (By.CSS_SELECTOR, 'div[class="course-list-item"]')))  # 已学\未学课程CSS_SELECTOR似乎不同，使用上级selector
+            # 已学\未学课程CSS_SELECTOR似乎不同，使用上级selector
+            (By.CSS_SELECTOR, 'div[class="course-list-item"]')))
         valid_courses = [c for c in courses if c.text != '']
         # logging.info(len(valid_courses))
         for c in valid_courses:
@@ -270,7 +326,8 @@ def get_special_course_to_learn():
     while cur_active <= page_cnt:
         sleep(1)
         courses = WebDriverWait(driver, TIMEOUT_SEC).until(EC.presence_of_all_elements_located(
-            (By.CSS_SELECTOR, 'div[class="class-card gestures "]')))  # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+            # 获取所有学习状态按钮 （ 已学习 / 未学习 ）
+            (By.CSS_SELECTOR, 'div[class="class-card gestures "]')))
         valid_courses = [c for c in courses if c.text != '']
         # logging.info(len(valid_courses))
         for c in valid_courses:
@@ -362,12 +419,12 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         else:
             print(f'\r尝试获取测试信息：has_test->{has_test}', end='', flush=True)
         sleep(.2)
-    
+
     print('\n')
     logging.info('等待播放结束')
-    
+
     if has_test == '是':
-        sleep(5) # 确保视频播放完
+        sleep(5)  # 确保视频播放完
         # 视频播放后可能自动跳转或不跳转，在do_exam里处理
         do_exam()
     else:
@@ -380,6 +437,7 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
 
     logging.info('此课程学习完成\n')
     update_credit_hours(course_info)
+
 
 '''
 2025-10-31发现题目、选项顺序会变！改为使用题干、题目选项的哈希
@@ -400,11 +458,14 @@ ans_dic =
     ...
 }  
 '''
+
+
 def gen_hash(text):
     # 创建SHA-256哈希对象
     hash_object = hashlib.sha256(text.encode('utf-8'))
     # 返回十六进制格式的哈希值作为题目ID
     return hash_object.hexdigest()
+
 
 def next_choice(dic):
     # 创建新字典，保留'type'键值对
@@ -414,11 +475,11 @@ def next_choice(dic):
     hash_keys = [k for k in dic.keys() if k != 'type']
     # 提取哈希键对应的值，组成二进制字符串
     bin_str = ''.join(dic[k] for k in hash_keys)
-    
-    if not type: # 单选/判断：对二进制字符串进行右移一位操作
+
+    if not type:  # 单选/判断：对二进制字符串进行右移一位操作
         new_bin_str = '0' + bin_str[:-1]
-    else: # 多选：
-        new_bin_str = bin((int(bin_str, 2) -1))[2:].zfill(len(dic.keys())-1)
+    else:  # 多选：
+        new_bin_str = bin((int(bin_str, 2) - 1))[2:].zfill(len(dic.keys())-1)
 
     # 将新的二进制值分配回对应的哈希键
     for i, key in enumerate(hash_keys):
@@ -428,13 +489,13 @@ def next_choice(dic):
 
 def do_exam():
     logging.info('正在进入测试')
-    
-    while True: # 用于解决：某些课程可能需要手动点击进入测试；进入测试后可能页面空白
+
+    while True:  # 用于解决：某些课程可能需要手动点击进入测试；进入测试后可能页面空白
         if 'examManage' in driver.current_url:
             question_status = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
                 EC.visibility_of_element_located(
                     (By.CSS_SELECTOR,
-                    'div[class="top_e"]'))
+                     'div[class="top_e"]'))
             )
             if question_status == '1/0':
                 logging.warning('出现测试页面空白，尝试重进')
@@ -443,7 +504,8 @@ def do_exam():
             break
         elif 'coursedetail' in driver.current_url:
             try:
-                driver.find_element(By.CSS_SELECTOR, 'img.rightBottom').click() # "随堂测试 立即进入"
+                driver.find_element(
+                    By.CSS_SELECTOR, 'img.rightBottom').click()  # "随堂测试 立即进入"
             except:
                 sleep(.2)
                 continue
@@ -451,10 +513,9 @@ def do_exam():
         else:
             logging.error(f'URL异常：{driver.current_url}')
             raise
-    
-    sleep(.2) # 等待，提升稳定性
+
+    sleep(.2)  # 等待，提升稳定性
     logging.info('已进入测试')
-    
 
     # 获取进入测试页面后的“确定”按钮
     button = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
@@ -463,77 +524,84 @@ def do_exam():
              'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))
     )
 
-
-    driver.execute_script("arguments[0].click();", button) # 使用 javascript 点击 确定
-
-    
+    # 使用 javascript 点击 确定
+    driver.execute_script("arguments[0].click();", button)
 
     question_num = int(driver.find_element(By.CSS_SELECTOR,
-                                        'div[class="top_e"] div').text.split('/')[1])  # 题目数
+                                           # 题目数
+                                           'div[class="top_e"] div').text.split('/')[1])
     logging.info(f'进入测试，共 {question_num} 题')
 
     question_type_map = {
-        '单选':0,
-        '判断':0,
-        '多选':1
+        '单选': 0,
+        '判断': 0,
+        '多选': 1
     }
 
-    ans_dic = {}  # 答案字典    
+    ans_dic = {}  # 答案字典
     while True:
         # 获取所有 下一题/交卷 按钮
         # 此处获取了所有 上一题 / 下一题 /交卷，筛选出偶数项
-        next_n_submit_buttons = driver.find_elements(By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
+        next_n_submit_buttons = driver.find_elements(
+            By.CSS_SELECTOR, 'div.bast_quest_btn')[1::2]
 
-        all_questions = [] # 所有题目的题干、选项
-        while not len(all_questions): # 等待题目完全显示
+        all_questions = []  # 所有题目的题干、选项
+        while not len(all_questions):  # 等待题目完全显示
             sleep(.2)
             all_questions = WebDriverWait(driver, TIMEOUT_SEC).until(
-                    EC.presence_of_all_elements_located(
-                        (By.CSS_SELECTOR,
-                        'div[class="examcontent"]'))
-                )
+                EC.presence_of_all_elements_located(
+                    (By.CSS_SELECTOR,
+                     'div[class="examcontent"]'))
+            )
         assert len(all_questions) == question_num
-        
-        current_stem_hashes = [] # 用于顺序存储此轮题目哈希
 
-        if ans_dic: # 不为空，则非第一轮
+        current_stem_hashes = []  # 用于顺序存储此轮题目哈希
+
+        if ans_dic:  # 不为空，则非第一轮
             ans_dic_lst = list(ans_dic.values())
-            ans_dic_value_lst = [''.join(map(str,list(i.values()))) for i in ans_dic_lst]
+            ans_dic_value_lst = [
+                ''.join(map(str, list(i.values()))) for i in ans_dic_lst]
             logging.info(f'非第一轮答题，尝试答案：{ans_dic_value_lst}')
         else:
             logging.info(f'第一轮答题，尝试默认答案')
 
         # 遍历处理每个题目
-        for i, q in enumerate(all_questions): # 将all_questions的题干、选项做哈希，存到ans_dic里
+        for i, q in enumerate(all_questions):  # 将all_questions的题干、选项做哈希，存到ans_dic里
             sleep(.2)
             # q文本："1. 单选 题干XXX \nA aaa \nB bbb ..."
-            question_elem = q.find_elements(By.CSS_SELECTOR,'div') # 注意到 q包含两个div，其一是题干，其二是各选项
-            
+            question_elem = q.find_elements(
+                By.CSS_SELECTOR, 'div')  # 注意到 q包含两个div，其一是题干，其二是各选项
+
             # 获取类型、题干
-            question_stem_text = question_elem[0].text.split('. ', maxsplit=1)[1] #题干，去掉题号
-            question_type, question_stem_text = question_stem_text.split(' ', maxsplit=1) #去掉类型（单选多选判断）
-            
+            question_stem_text = question_elem[0].text.split('. ', maxsplit=1)[
+                1]  # 题干，去掉题号
+            question_type, question_stem_text = question_stem_text.split(
+                ' ', maxsplit=1)  # 去掉类型（单选多选判断）
+
             # 获取选项元素及文本
-            question_opts_elems = question_elem[1].find_elements(By.CSS_SELECTOR, 'label')
-            question_opts_texts = [opt_elem.text.split(' ', maxsplit=1)[1] for opt_elem in question_opts_elems]
-            
+            question_opts_elems = question_elem[1].find_elements(
+                By.CSS_SELECTOR, 'label')
+            question_opts_texts = [opt_elem.text.split(
+                ' ', maxsplit=1)[1] for opt_elem in question_opts_elems]
+
             # 求哈希
             stem_hash = gen_hash(question_stem_text)
             opts_hash = list(map(gen_hash, question_opts_texts))
 
             current_stem_hashes.append(stem_hash)
-            
+
             # ans_dic 初次写入信息
             if stem_hash not in ans_dic.keys():
                 # 组 ans_dic
                 type = question_type_map[question_type]
-                opts_num = len(opts_hash) # 选项个数
-                if type: # 多选：
-                    target_opts = '1'*opts_num # 如：1111
+                opts_num = len(opts_hash)  # 选项个数
+                if type:  # 多选：
+                    target_opts = '1'*opts_num  # 如：1111
                 else:
-                    target_opts = '1'+'0'*(opts_num-1) # 如：1000
+                    target_opts = '1'+'0'*(opts_num-1)  # 如：1000
                 # 合并字典
-                ans_dic[stem_hash] = {'type':type} | dict(zip(opts_hash, target_opts))
+                ans_dic[stem_hash] = {'type': type} | dict(
+                    zip(opts_hash, target_opts))
 
                 '''
                 得到：
@@ -546,10 +614,11 @@ def do_exam():
                     'ac6879236e5c0fa112468b2b4edf3df8b0dc0f3189aacae7d7cb00c218cff10e': '0'}
                     }
                 '''
-            
+
             # 遍历每个选项 判断是否勾选
             for j, opt_elem in enumerate(question_opts_elems):
-                toCheck = int(ans_dic[stem_hash][gen_hash(question_opts_texts[j])])
+                toCheck = int(ans_dic[stem_hash]
+                              [gen_hash(question_opts_texts[j])])
                 if toCheck:
                     sleep(.2)
                     opt_elem.click()
@@ -558,50 +627,60 @@ def do_exam():
             assert next_n_submit_buttons[i].text != ''
             next_n_submit_buttons[i].click()  # 点击 下一题（或交卷）
             if i == question_num - 1:
-                try: # 解决可能不点击 交卷 的问题
+                try:  # 解决可能不点击 交卷 的问题
                     sleep(.5)
-                    next_n_submit_buttons[i].click() # 尝试再点一次
+                    next_n_submit_buttons[i].click()  # 尝试再点一次
                 except:
-                    logging.info('答案已提交') #如果出现异常，说明已点击 交卷
-                
+                    logging.info('答案已提交')  # 如果出现异常，说明已点击 交卷
+
                 WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()  # 交卷 确定
+                    # 交卷 确定
+                    (By.CSS_SELECTOR, 'button[class="el-button el-button--default el-button--small el-button--primary "]'))).click()
 
                 result_info = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
-                    (By.CSS_SELECTOR, 'div[class="infoclass"]'))).text  # 获取测试结果
+                    # 获取测试结果
+                    (By.CSS_SELECTOR, 'div[class="infoclass"]'))).text
                 logging.info('获取测试结果')
-                
+
                 if result_info.split('\n')[0][-3:] == '不合格':  # 测试不合格，回看试题
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
                         (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--default el-button--mini"]'))).click()
-                    
+
                     logging.info('未通过测试，进入回看记录答案')
-                    
+
                     # 获取错误题目
                     wrong_answers = WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(
                         EC.visibility_of_all_elements_located((By.CSS_SELECTOR, 'li[class="activess isred"]')))
-                    wrong_answer_idx = [int(a.text)-1 for a in wrong_answers] # 错题 idx
-                    for i in wrong_answer_idx: # 处理错题
+                    wrong_answer_idx = [
+                        int(a.text)-1 for a in wrong_answers]  # 错题 idx
+                    for i in wrong_answer_idx:  # 处理错题
                         # 某题做错，需把这题的答案 右移（单选） 或 减一（多选）
                         # 不必管选项顺序，选项是按哈希点的，此处只处理：“题错了，调整为下一选项” 就可以了
                         # 但需要对应到相应的题目上
-                        ans_dic[current_stem_hashes[i]] = next_choice(ans_dic[current_stem_hashes[i]])
+                        ans_dic[current_stem_hashes[i]] = next_choice(
+                            ans_dic[current_stem_hashes[i]])
 
                     driver.find_element(By.CSS_SELECTOR,
-                                        'button[class="el-button exit el-button--default el-button--mini"]').click()  # 退出回看
+                                        # 退出回看
+                                        'button[class="el-button exit el-button--default el-button--mini"]').click()
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()  # 重新进入测试
+                        # 重新进入测试
+                        (By.CSS_SELECTOR, 'img[class="rightBottom"]'))).click()
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()  # 确定
+                        # 确定
+                        (By.CSS_SELECTOR, 'button[class="el-button modelBtn doingBtn el-button--primary el-button--mini"]'))).click()
                     logging.info('退出回看，重新测试')
                 else:
                     WebDriverWait(driver, TIMEOUT_SEC + WAIT_LONGER_SEC).until(EC.visibility_of_element_located(
-                        (By.CSS_SELECTOR, 'button[class="el-button modelBtn exitBtn  el-button--primary el-button--mini"]'))).click()  # 通过测试，退出
+                        # 通过测试，退出
+                        (By.CSS_SELECTOR, 'button[class="el-button modelBtn exitBtn  el-button--primary el-button--mini"]'))).click()
                     logging.info('通过测试')
                     return
 
 # 每5分移动一次鼠标，避免系统休眠或关机
 # 不确定这东西管不管用……先放着吧
+
+
 def prevent_sleep():
     while True:
         # 移动鼠标一个像素并移回原位
@@ -648,7 +727,6 @@ get_credit_hours()
 # ------------------------------------------------------
 
 
-
 # 时间紧任务重，直接这么搞吧
 # if __name__ == "__main__":
 #     while True:
@@ -663,8 +741,8 @@ get_credit_hours()
 #             sleep(10)
 #             continue
 #         logging.info('本轮成功执行\n')
-        
-    
+
+
 # ------------------------------------------------------
 
 # 学习课程
