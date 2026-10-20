@@ -368,6 +368,17 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
             break
         sleep(.1)
 
+    # 如果有播放限速的相关提示，点击“我知道了”
+    # 直接find_element，因此处已出现播放时长，通常如果有这个弹出，也已经出来了
+    notice_button = driver.find_element(By.XPATH, "//span[normalize-space(.)='我知道了']")
+    if notice_button:
+        notice_button.click()
+
+    # 切换为1.5倍速，默认情况按一次到1.5，此处直接使用简单逻辑
+    # rate = driver.execute_script("return document.querySelector('.vjs-playback-rate-value').textContent.trim()")
+    # if rate != '1.5x':
+    driver.execute_script("document.querySelector('.vjs-playback-rate').click()")
+
     total_duration = [int(i) for i in total_duration_text.split(':')]
 
     if len(total_duration) == 3:
@@ -392,6 +403,9 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
                 played_duration[1] * 60 + played_duration[2]
         else:
             played_dur_sec = played_duration[0] * 60 + played_duration[1]
+
+
+        
         print(
             f'\r视频播放中 {played_duration_text} / {total_duration_text}', end='', flush=True)
 
