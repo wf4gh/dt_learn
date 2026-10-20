@@ -5,6 +5,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support.expected_conditions import presence_of_element_located
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+import selenium
 from time import sleep
 import re
 import sys
@@ -370,15 +371,16 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
 
     # 如果有播放限速的相关提示，点击“我知道了”
     # 直接find_element，因此处已出现播放时长，通常如果有这个弹出，也已经出来了
-    notice_button = driver.find_element(By.XPATH, "//span[normalize-space(.)='我知道了']")
-    if notice_button:
-        notice_button.click()
+    try:
+        notice_button = driver.find_element(By.XPATH, "//span[normalize-space(.)='我知道了']")
+        if notice_button:
+            notice_button.click()
+    except selenium.common.exceptions.ElementNotInteractableException:
+        pass
 
-    # 切换为1.5倍速，默认情况按一次到1.5，此处直接使用简单逻辑
-    # rate = driver.execute_script("return document.querySelector('.vjs-playback-rate-value').textContent.trim()")
-    # if rate != '1.5x':
-    driver.execute_script("document.querySelector('.vjs-playback-rate').click()")
-
+    # 切换为1.5倍速
+    driver.execute_script("document.querySelector('video').playbackRate=1.5")
+    
     total_duration = [int(i) for i in total_duration_text.split(':')]
 
     if len(total_duration) == 3:
