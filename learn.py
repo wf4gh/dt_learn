@@ -375,7 +375,8 @@ def learn_course(course_info=None, watch_video=True, is_subject_course=False):
         notice_button = driver.find_element(By.XPATH, "//span[normalize-space(.)='我知道了']")
         if notice_button:
             notice_button.click()
-    except selenium.common.exceptions.ElementNotInteractableException:
+    # except selenium.common.exceptions.ElementNotInteractableException or selenium.common.exceptions.NoSuchElementException:
+    except:
         pass
 
     # 切换为1.5倍速
